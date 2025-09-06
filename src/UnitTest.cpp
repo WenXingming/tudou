@@ -15,6 +15,35 @@
 #include <unistd.h>
 #include <arpa/inet.h>
 #include <memory>
+#include <pthread.h>
+
+
+ // 传输、处理数据: recv()、close()、send()
+void* client_thread(void* fd) {
+    int fdClient = *(int*)fd;
+    while (true) {
+        char buffer[1024] = { 0 };
+        int length = recv(fdClient, buffer, 1024, 0); // 阻塞函数
+        if (length == -1) {
+            perror("recv error!\n");
+        }
+
+        if (length == 0) {
+            close(fdClient);
+            printf("close fd: %d\n", fdClient);
+            break;
+        }
+
+        printf("buffer: %s", buffer); // 处理数据。可扔给线程池处理（IO和计算密集型解耦）
+
+        int retSend = send(fdClient, buffer, length, 0);
+        if (retSend == -1) {
+            perror("send error!\n");
+        }
+    }
+    return (void*)NULL;
+}
+
 
 int main(int argc, char* argv[]) {
     // 创建监听套接字: socket()。
@@ -48,39 +77,20 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // 创建连接套接字: accept()
-    sockaddr_in clientAddr;
-    socklen_t len = sizeof(clientAddr);
-    int fdClient = accept(fdListen, (sockaddr*)&clientAddr, &len); // 阻塞函数
-    if (fdClient == -1) {
-        perror("accept failed!\n");
-        return -1;
-    }
-
-    // 我们希望一直接收、处理数据: recv()、close()、send()
+    // 创建连接套接字: accept()。我们希望能够建立多个连接
     while (true) {
-        char buffer[1024] = { 0 };
-        int length = recv(fdClient, buffer, 1024, 0); // 阻塞函数
-        if (length == -1) {
-            perror("recv error!\n");
+        sockaddr_in clientAddr;
+        socklen_t len = sizeof(clientAddr);
+        int fdClient = accept(fdListen, (sockaddr*)&clientAddr, &len); // 阻塞函数
+        if (fdClient == -1) {
+            perror("accept failed!\n");
+            return -1;
         }
 
-        // 主动断开方会进入 time_wait... 短时间重新启动：bind failed! Address already in use。所以服务器尽量被动断开连接
-        // length == 0 代表对方调用了 close()
-        // 接收到 FIN，发送 ACK。根据状态机，服务器进入 CLOSE_WAIT 状态，但可以继续发送数据；服务端调用 close() 即可进入下个状态
-        if (length == 0) {
-            close(fdClient);
-            printf("close fd: %d\n", fdClient);
-            break;
-        }
-
-        printf("fdListen: %d, fdClient: %d, length: %d\n", fdListen, fdClient, length);
-        printf("buffer: %s", buffer); // 处理数据，可扔给线程池处理（IO任务和计算密集型任务解耦）
-
-        int retSend = send(fdClient, buffer, length, 0); // 发送数据，这是一个简单的回声服务器
-        if (retSend == -1) {
-            perror("send error!\n");
-        }
+        // 每个连接分配一个线程进行数据收发、处理
+        pthread_t thid;
+        pthread_create(&thid, NULL, client_thread, &fdClient);  // 严重漏洞。只会拷贝指针到新线程栈，而不是指针指向的对象（需要线程里面自己解引用）。如果 fdClient 退出作用域了，线程内部解引用就很危险
+        pthread_detach(thid);
     }
 
     getchar();
