@@ -59,10 +59,8 @@ int main(int argc, char* argv[]) {
 
     // 我们希望一直接收、处理数据: recv()、close()、send()
     while (true) {
-        std::shared_ptr<char> bufferPtr(new char[1024], [](char* p) {
-            delete[] p;
-            }); // 智能指针管理数组，自定义删除器
-        int length = recv(fdClient, bufferPtr.get(), 1024, 0); // 阻塞函数
+        char buffer[1024] = { 0 };
+        int length = recv(fdClient, buffer, 1024, 0); // 阻塞函数
         if (length == -1) {
             perror("recv error!\n");
         }
@@ -77,9 +75,9 @@ int main(int argc, char* argv[]) {
         }
 
         printf("fdListen: %d, fdClient: %d, length: %d\n", fdListen, fdClient, length);
-        printf("buffer: %s", bufferPtr.get()); // 处理数据，可扔给线程池处理（IO任务和计算密集型任务解耦）
+        printf("buffer: %s", buffer); // 处理数据，可扔给线程池处理（IO任务和计算密集型任务解耦）
 
-        int retSend = send(fdClient, bufferPtr.get(), length, 0); // 发送数据，这是一个简单的回声服务器
+        int retSend = send(fdClient, buffer, length, 0); // 发送数据，这是一个简单的回声服务器
         if (retSend == -1) {
             perror("send error!\n");
         }
