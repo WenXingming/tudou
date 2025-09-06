@@ -16,13 +16,11 @@
 #include <arpa/inet.h>
 #include <memory>
 #include <pthread.h>
+#include <thread>
 
 
- // 传输、处理数据: recv()、close()、send()
-void* client_thread(void* fd) {
-    int* fd_ptr = (int*)fd;
-    int fdClient = *(int*)fd;
-    free(fd_ptr);
+// 传输、处理数据: recv()、close()、send()
+void client_thread(int fdClient) {
     while (true) {
         char buffer[1024] = { 0 };
         int length = recv(fdClient, buffer, 1024, 0); // 阻塞函数
@@ -43,7 +41,6 @@ void* client_thread(void* fd) {
             perror("send error!\n");
         }
     }
-    return (void*)NULL;
 }
 
 
@@ -79,25 +76,19 @@ int main(int argc, char* argv[]) {
         return -1;
     }
 
-    // 创建连接套接字: accept()。我们希望能够建立多个连接
+    // 创建连接套接字: accept()
     while (true) {
         sockaddr_in clientAddr;
         socklen_t len = sizeof(clientAddr);
-        int* fdClient_ptr = (int*)malloc(sizeof(int));
-        if (!fdClient_ptr) {
-            printf("malloc failed!\n");
-            return -1;
-        }
-        *fdClient_ptr = accept(fdListen, (sockaddr*)&clientAddr, &len); // 阻塞函数
-        if (*fdClient_ptr == -1) {
+        int fdClient = accept(fdListen, (sockaddr*)&clientAddr, &len); // 阻塞函数
+        if (fdClient == -1) {
             perror("accept failed!\n");
             return -1;
         }
 
         // 每个连接套接字分配一个线程进行数据收发、处理
-        pthread_t thid;
-        pthread_create(&thid, NULL, client_thread, fdClient_ptr);
-        pthread_detach(thid);
+        std::thread t(client_thread, fdClient); // 异步
+        t.detach(); // 每定义一个线程必须确定是 join() or detach()
     }
 
     getchar();
