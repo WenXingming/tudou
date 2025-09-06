@@ -80,6 +80,7 @@ int main(int argc, char* argv[]) {
         if (retSend == -1) {
             perror("send error!\n");
         }
+        delete[] buffer;
     }
 
     getchar();
