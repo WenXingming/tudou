@@ -18,55 +18,59 @@
 #include <pthread.h>
 #include <thread>
 #include <poll.h>
+#include <sys/poll.h>
+#include <sys/epoll.h>
 
 
  /// @brief 连接建立事件。创建连接套接字: accept()
  /// @param fdListen 
- /// @param fds 
- /// @param maxfd 
-void connect(int fdListen, pollfd* fds, int& maxfd) {
+ /// @param epfd 
+void connect(int fdListen, int epfd) {
     printf("fdListen: %d is set.\n", fdListen);
 
     sockaddr_in clientAddr;
     socklen_t len = sizeof(clientAddr);
     int fdClient = accept(fdListen, (sockaddr*)&clientAddr, &len); // 阻塞。其实不会阻塞，因为 if 已经说明了有连接请求
     if (fdClient == -1) {
-        perror("accept failed!\n");
+        perror("accept failed!");
         return;
     }
 
     printf("fdClient: %d is accepted.\n", fdClient);
 
-    maxfd = std::max(maxfd, fdClient + 1);
-    fds[fdClient].fd = fdClient;
-    fds[fdClient].events = POLLIN;
+    // 维护 epoll
+    epoll_event event;
+    event.events = EPOLLIN /* EPOLLIN | EPOLLET */; // 水平触发 LT, level trigger。边沿触发 ET, edge trigger，设置缓存较小试一试
+    event.data.fd = fdClient;
+    epoll_ctl(epfd, EPOLL_CTL_ADD, fdClient, &event);
 }
 
 
 /// @brief 传输、处理数据: recv()、close()、send()。注意是一次数据传输，所以不用 while 循环
-/// @param fd 
-/// @param fds 
+/// @param clientfd 
+/// @param epfd 
 /// @attention 这里不够细粒度，同时包含接受、发送数据，后续学习 reactor 会将其更加详细分类
-void data_process(int fd, pollfd* fds) {
-    char buffer[128] = { 0 };
-    int length = recv(fd, buffer, 128, 0); // 阻塞函数
+void data_process(int clientfd, int epfd) {
+    char buffer[1024] = { 0 };
+    int length = recv(clientfd, buffer, 1024, 0); // 阻塞函数
+
     if (length == -1) {
-        perror("recv error!\n");
+        perror("recv error!");
     }
 
     if (length == 0) {
-        close(fd);
-        printf("close fdClient: %d\n", fd);
-        fds[fd].fd = -1;
-        fds[fd].events = 0;
+        printf("close clientfd.\n");
+        close(clientfd);
+        // 维护 epoll
+        epoll_ctl(epfd, EPOLL_CTL_DEL, clientfd, NULL);
         return;
     }
 
     printf("buffer: %s", buffer); // 处理数据
 
-    int retSend = send(fd, buffer, length, 0);
+    int retSend = send(clientfd, buffer, length, 0);
     if (retSend == -1) {
-        perror("send error!\n");
+        perror("send error!");
     }
 }
 
@@ -104,32 +108,28 @@ int main(int argc, char* argv[]) {
     }
 
 
-    /// DO: pool 需要的数据结构初始化。不像 select 采用位数组，poll 采用结构体数组
-    pollfd fds[1024] = { 0 };
-    fds[fdListen].fd = fdListen;
-    fds[fdListen].events = POLLIN;
-    int maxFd = fdListen + 1;
+    /// DO: epoll 初始化
+    int epfd = epoll_create(1); // 现在参数已经无用，> 0 即可（现使用链表无限扩展）。epfd 占用了 4 号 fd，所以 fdClient 从 5开始
+    epoll_event ev;
+    ev.events = EPOLLIN;
+    ev.data.fd = fdListen;
+    epoll_ctl(epfd, EPOLL_CTL_ADD, ev.data.fd, &ev);
 
     // 一直处理 IO 多路复用事件
+    epoll_event eventList[1024] = { 0 };
     while (true) {
-        int nready = poll(fds, maxFd, -1); // 阻塞。maxfd 非强制使用，可以写 1024，只是为了遍历少一些。最优是 vector + nfds
-        if (nready == -1) {
-            perror("poll error!\n");
-            continue;
-        }
-        if (nready == 0) continue;
+        int nready = epoll_wait(epfd, eventList, 1024, -1);
 
-        // 遍历找位数组置 1（就绪即有 IO 事件） 的 fd
-        for (int i = 0; i < maxFd; ++i) {
-            if (fds[i].revents & POLLIN) {
-                if (fds[i].fd == fdListen) {
-                    connect(fdListen, fds, maxFd);
+        for (int i = 0; i < nready; ++i) {
+            int fd = eventList[i].data.fd;
+            if (eventList[i].events & EPOLLIN) {
+                if (fd == fdListen) {
+                    connect(fd, epfd);
                 }
                 else {
-                    data_process(i, fds);
+                    data_process(fd, epfd);
                 }
             }
-            else;
         }
     }
 
