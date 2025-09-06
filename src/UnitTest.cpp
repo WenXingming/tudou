@@ -1,3 +1,11 @@
+/**
+ * @file UnitTest.cpp
+ * @brief 多路 IO 复用
+ * @author wenxingming
+ * @date 2025-09-06
+ * @note My project address: https://github.com/WenXingming/Multi_IO
+ */
+
 #include <cstdio>
 #include <cstdlib>
 #include <cassert>
@@ -9,25 +17,21 @@
 
 int main(int argc, char* argv[]) {
     // 创建监听套接字: socket()。
-    // fd 描述符依次增加，从 3 开始。因为 std::in、std::out、std::err 分别是 0、1、2
-    // ls / dev / std * 查看 fd
     int fdListen = socket(PF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (fdListen == -1) {   // assert(sockfdListen != -1);
-        perror("sockfdListen create failed!\n");
-        return -1;
-    }
+    assert(fdListen != -1);
 
     // 绑定监听 ip + port: bind()
-    // 使用的 ip 地址和 port 以结构体（sockaddr_in）的形式给出了定义
-    const char* ip = "127.0.0.1"; // 虚拟回环接口。注意和物理网络接口（如eth0、wlan0，例如192.168.3.2）是各自独立的，无法通过 192.168.3.2:2048 访问
+    const char* ip = "127.0.0.1";
     const char* port = "2048";
 
     sockaddr_in serverAddr;
     memset(&serverAddr, 0, sizeof(serverAddr));
     serverAddr.sin_family = PF_INET;
-    serverAddr.sin_addr.s_addr = inet_addr(ip); // 基于字符串的地址初始化，返回网络序（大端）。字节序：如果直接把主机 CPU 字节序的值放进sockaddr_in结构体，然后发到网络上，不同端的主机会读错ip、port（不同主机 CPU 大小端不同）
-    if (argc == 2) serverAddr.sin_port = htons(atoi(argv[1]));
-    else serverAddr.sin_port = htons(atoi(port));
+    serverAddr.sin_addr.s_addr = htonl(INADDR_ANY); // 绑定到所有网络接口（包括虚拟回环接口和物理网络接口）
+    if (argc == 2)
+        serverAddr.sin_port = htons(atoi(argv[1]));
+    else
+        serverAddr.sin_port = htons(atoi(port));
 
     int retBind = bind(fdListen, (sockaddr*)&serverAddr, sizeof(serverAddr));
     if (retBind == -1) {
@@ -41,6 +45,41 @@ int main(int argc, char* argv[]) {
         perror("listen failed!\n");
         getchar();
         return -1;
+    }
+
+    // 创建连接套接字: accept()
+    sockaddr_in clientAddr;
+    socklen_t len = sizeof(clientAddr);
+    int fdClient = accept(fdListen, (sockaddr*)&clientAddr, &len); // 阻塞函数
+    if (fdClient == -1) {
+        perror("accept failed!\n");
+        return -1;
+    }
+
+    // 我们希望一直接收、处理数据: recv()、close()、send()
+    while (true) {
+        char* buffer = new char[1024];
+        int length = recv(fdClient, buffer, 1024, 0); // 阻塞函数
+        if (length == -1) {
+            perror("recv error!\n");
+        }
+
+        // 主动断开方会进入 time_wait... 短时间重新启动：bind failed! Address already in use。所以服务器尽量被动断开连接
+        // length == 0 代表对方调用了 close()
+        // 接收到 FIN，发送 ACK。根据状态机，服务器进入 CLOSE_WAIT 状态，但可以继续发送数据；服务端调用 close() 即可进入下个状态
+        if (length == 0) {
+            close(fdClient);
+            printf("close fd: %d\n", fdClient);
+            break;
+        }
+
+        printf("fdListen: %d, fdClient: %d, length: %d\n", fdListen, fdClient, length);
+        printf("buffer: %s", buffer); // 处理数据，可扔给线程池处理（IO任务和计算密集型任务解耦）
+
+        int retSend = send(fdClient, buffer, length, 0); // 发送数据，这是一个简单的回声服务器
+        if (retSend == -1) {
+            perror("send error!\n");
+        }
     }
 
     getchar();
