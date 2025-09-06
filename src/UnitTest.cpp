@@ -17,14 +17,14 @@
 #include <memory>
 #include <pthread.h>
 #include <thread>
+#include <poll.h>
 
 
  /// @brief 连接建立事件。创建连接套接字: accept()
  /// @param fdListen 
+ /// @param fds 
  /// @param maxfd 
- /// @param reads 
- /// @return fdClient 
-int connect_event(int fdListen, int& maxFd, fd_set& reads) {
+void connect(int fdListen, pollfd* fds, int& maxfd) {
     printf("fdListen: %d is set.\n", fdListen);
 
     sockaddr_in clientAddr;
@@ -32,43 +32,41 @@ int connect_event(int fdListen, int& maxFd, fd_set& reads) {
     int fdClient = accept(fdListen, (sockaddr*)&clientAddr, &len); // 阻塞。其实不会阻塞，因为 if 已经说明了有连接请求
     if (fdClient == -1) {
         perror("accept failed!\n");
-        return -1;
+        return;
     }
 
     printf("fdClient: %d is accepted.\n", fdClient);
 
-    // 维护 select 数据结构：maxFd、reads
-    maxFd = std::max(maxFd, fdClient + 1);
-    FD_SET(fdClient, &reads);
-
-    return fdClient;
+    maxfd = std::max(maxfd, fdClient + 1);
+    fds[fdClient].fd = fdClient;
+    fds[fdClient].events = POLLIN;
 }
 
+
 /// @brief 传输、处理数据: recv()、close()、send()。注意是一次数据传输，所以不用 while 循环
-/// @param fdClient 
-/// @param reads 
+/// @param fd 
+/// @param fds 
 /// @attention 这里不够细粒度，同时包含接受、发送数据，后续学习 reactor 会将其更加详细分类
-void data_process(int fdClient, fd_set& reads) {
-    char buffer[1024] = { 0 };
-    int length = recv(fdClient, buffer, 1024, 0); // 阻塞函数
+void data_process(int fd, pollfd* fds) {
+    char buffer[128] = { 0 };
+    int length = recv(fd, buffer, 128, 0); // 阻塞函数
     if (length == -1) {
         perror("recv error!\n");
-        return;
     }
 
     if (length == 0) {
-        close(fdClient);
-        printf("close fdClient: %d\n", fdClient);
-        FD_CLR(fdClient, &reads); // 维护 fd_set，socket 和 fd_set 一一对应
+        close(fd);
+        printf("close fdClient: %d\n", fd);
+        fds[fd].fd = -1;
+        fds[fd].events = 0;
         return;
     }
 
-    printf("buffer: %s", buffer); // 处理数据。计算密集型任务，可扔进线程池处理
+    printf("buffer: %s", buffer); // 处理数据
 
-    int retSend = send(fdClient, buffer, length, 0);
+    int retSend = send(fd, buffer, length, 0);
     if (retSend == -1) {
         perror("send error!\n");
-        return;
     }
 }
 
@@ -106,33 +104,32 @@ int main(int argc, char* argv[]) {
     }
 
 
-    /// DO: select 需要的数据结构初始化。select(maxfd, reads, wset, eset, timeout)
-    int maxFd = fdListen + 1;   // 我习惯用左闭右开
-    fd_set reads;               // 位数组实现可读 fd 集合
-    FD_ZERO(&reads);
-    FD_SET(fdListen, &reads);   // 看源码，某一位置 1，构造一个数 | 运算
+    /// DO: pool 需要的数据结构初始化。不像 select 采用位数组，poll 采用结构体数组
+    pollfd fds[1024] = { 0 };
+    fds[fdListen].fd = fdListen;
+    fds[fdListen].events = POLLIN;
+    int maxFd = fdListen + 1;
 
     // 一直处理 IO 多路复用事件
     while (true) {
-        fd_set cpyReads = reads; // 必须 copy！
-        int nready = select(maxFd, &cpyReads, NULL, NULL, NULL); // 阻塞。监听所有 reads
+        int nready = poll(fds, maxFd, -1); // 阻塞。maxfd 非强制使用，可以写 1024，只是为了遍历少一些。最优是 vector + nfds
         if (nready == -1) {
-            perror("select error!\n");
-            return -1;
+            perror("poll error!\n");
+            continue;
         }
-        if (nready == 0) continue; // 主要是如果设置了 select 的 timeout，到时后阻塞状态会强行被停止，返回 0
+        if (nready == 0) continue;
 
         // 遍历找位数组置 1（就绪即有 IO 事件） 的 fd
         for (int i = 0; i < maxFd; ++i) {
-            if (FD_ISSET(i, &cpyReads)) {
-                if (i == fdListen) {
-                    connect_event(fdListen, maxFd, reads); // listen 事件
+            if (fds[i].revents & POLLIN) {
+                if (fds[i].fd == fdListen) {
+                    connect(fdListen, fds, maxFd);
                 }
                 else {
-                    data_process(i, reads); // date process 事件（read 事件）
+                    data_process(i, fds);
                 }
             }
-            else continue;
+            else;
         }
     }
 
