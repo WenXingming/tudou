@@ -6,16 +6,23 @@
  * @note My project address: https://github.com/WenXingming/Multi_IO
  */
 
+#include <unistd.h>
+#include <fcntl.h>
+#include <cstdio>
 #include <sys/socket.h>
 #include <errno.h>
 #include <iostream>
+#include <sys/epoll.h>
 #include "Connection.h"
 #include "EventLoop.h"
+#include "RegistrationCenter.h"
 
 static const bool debug = true;
 
-Connection::Connection(int _fd, bool _isListenFd)
-    : fd(_fd), isListenFd(_isListenFd), read_cb{ nullptr }, write_cb(nullptr), accept_cb(nullptr) {
+Connection::Connection(std::shared_ptr<RegistrationCenter> _registration, int _fd, bool _isListenFd)
+    : fd(_fd), isListenFd(_isListenFd), registrationCenter(_registration)
+    , read_cb{ nullptr }, write_cb(nullptr), accept_cb(nullptr) {
+
     // 设置非阻塞
     int flags = fcntl(fd, F_GETFL, 0);
     fcntl(fd, F_SETFL, flags | O_NONBLOCK);
@@ -31,12 +38,12 @@ Connection::~Connection() {
 /// @brief EventLoop 检测到事件触发时调用的回调函数
 /// @details 先从 fd 读数据（到 buffer），再执行业务层的回调函数（应用层利用 buffer 处理业务）
 /// @param loop 
-void Connection::handle_read(EventLoop& loop) {
+void Connection::handle_read() {
     // 和 fd 通信
     ssize_t ret = read_from_fd();
 
     if (ret == 0) {
-        loop.deregister_connection(fd);
+        registrationCenter->deregister_connection(fd);
         return;
     }
     else if (ret < 0/* ret == -1 */) {
@@ -53,12 +60,12 @@ void Connection::handle_read(EventLoop& loop) {
     epoll_event ev{};
     ev.data.fd = fd;
     ev.events = EPOLLOUT;
-    epoll_ctl(loop.get_epoll_fd(), EPOLL_CTL_MOD, fd, &ev);
+    epoll_ctl(registrationCenter->get_epoll_fd(), EPOLL_CTL_MOD, fd, &ev);
 }
 
 /// @brief EventLoop 检测到事件触发时调用的回调函数
 /// @details 业务层先执行回调函数（把业务层数据写入 buffer），再（从 buffer）向 fd 写数据
-void Connection::handle_write(EventLoop& loop) {
+void Connection::handle_write() {
     // 执行业务层回调函数
     if (write_cb)
         write_cb(*this);
@@ -74,14 +81,14 @@ void Connection::handle_write(EventLoop& loop) {
     epoll_event ev{};
     ev.data.fd = fd;
     ev.events = EPOLLIN;
-    epoll_ctl(loop.get_epoll_fd(), EPOLL_CTL_MOD, fd, &ev);
+    epoll_ctl(registrationCenter->get_epoll_fd(), EPOLL_CTL_MOD, fd, &ev);
 }
 
 /// @brief EventLoop 检测到事件触发时调用的回调函数。只有 listenConn 此回调不为 nullptr
 /// @param loop 
-void Connection::handle_accept(EventLoop& loop) {
+void Connection::handle_accept() {
     if (accept_cb)
-        accept_cb(loop, *this);
+        accept_cb(registrationCenter, *this);
 }
 
 /// @brief 从 fd 读取数据到 readBuffer

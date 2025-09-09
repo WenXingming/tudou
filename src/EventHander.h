@@ -1,7 +1,10 @@
 #pragma once
 
+#include <memory>
+
 class Connection;
 class EventLoop;
+class RegistrationCenter;
 
 // 虚基类 
 class EventHandler {
@@ -9,7 +12,7 @@ public:
     virtual ~EventHandler() = default;
     virtual void read_cb(Connection& conn);
     virtual void write_cb(Connection& conn);
-    virtual void accept_cb(EventLoop& loop, Connection& conn);
+    virtual void accept_cb(std::shared_ptr<RegistrationCenter> registeration, Connection& conn);
 };
 
 
@@ -19,5 +22,5 @@ public:
     ~EchoHandler() override = default;
     void read_cb(Connection& conn) override;
     void write_cb(Connection& conn) override;
-    void accept_cb(EventLoop& loop, Connection& listenConn) override;
+    void accept_cb(std::shared_ptr<RegistrationCenter> registeration, Connection& listenConn) override;
 };

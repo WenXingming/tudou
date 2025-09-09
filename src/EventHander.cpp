@@ -1,9 +1,10 @@
-#include "EventHander.h"
 #include <iostream>
+#include <netinet/in.h>
 
+#include "EventHander.h"
 #include "Connection.h"
 #include "EventLoop.h"
-#include <netinet/in.h>
+#include "RegistrationCenter.h"
 
 static const bool debug = true;
 
@@ -15,7 +16,7 @@ void EventHandler::write_cb(Connection& conn) {
     if (debug) std::cout << "virtual function handle_write called.\n";
 }
 
-void EventHandler::accept_cb(EventLoop& loop, Connection& conn) {
+void EventHandler::accept_cb(std::shared_ptr<RegistrationCenter> registeration, Connection& conn) {
     if (debug) std::cout << "virtual function handle_accept called.\n";
 }
 
@@ -37,18 +38,18 @@ void EchoHandler::write_cb(Connection& conn) {
     std::cout << "send done on fd " << conn.get_fd() << std::endl;
 }
 
-void EchoHandler::accept_cb(EventLoop& loop, Connection& listenConn) {
+void EchoHandler::accept_cb(std::shared_ptr<RegistrationCenter> registeration, Connection& listenConn) {
     sockaddr_in clientAddr{};
     socklen_t len = sizeof(clientAddr);
     int clientFd = accept(listenConn.get_fd(), (sockaddr*)&clientAddr, &len);
     std::cout << "accept new client: " << clientFd << std::endl;
 
-    auto clientConn = std::make_shared<Connection>(clientFd);
+    auto clientConn = std::make_shared<Connection>(registeration, clientFd);
     clientConn->set_read_cb([this](Connection& conn) {
         this->read_cb(conn);
         });
     clientConn->set_write_cb([this](Connection& conn) {
         this->write_cb(conn);
         });
-    loop.register_connection(clientConn);
+    registeration->register_connection(clientConn);
 }
