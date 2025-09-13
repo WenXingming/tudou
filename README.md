@@ -1,5 +1,23 @@
 # Reactor 模式的 IO 多路复用
 
+```mermaid
+sequenceDiagram
+
+    participant EventLoop
+    participant Poller
+    participant Channel
+    participant TcpAcceptor
+    participant TcpConnection
+	
+	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
+	Poller->>EventLoop: 返回发生事件的 channels 给 eventLoop
+	EventLoop->>Channel: eventloop 通知 channel 处理回调
+	Channel->> TcpAcceptor: 根据事件进行回调
+	Channel->> TcpConnection: 根据事件进行回调
+	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
+    
+```
+
 ![Reactor](/doc/Reactor.png)
 
 一个典型的 Reactor 系统有几个核心组件：
