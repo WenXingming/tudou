@@ -18,36 +18,32 @@ TcpServer::TcpServer(EventLoop* _loop, const InetAddress& _listenAddr)
     , loop(_loop)
     , messageCallback(nullptr) {
 
-    acceptor->set_new_connection_callback(
-        // &TcpServer::new_connection // 成员函数有默认 this 参数
+    acceptor->subscribe_new_connection(
         // 绑定 this 参数会有风险吗？此时构造函数还未执行完，就使用了 this 指针。其实也没事，只是绑定，没有通过 this 访问类成员（还未构造完不可访问，否则有风险）
-        std::bind(&TcpServer::new_connection, this, std::placeholders::_1)
-
-        /*
-        // 使用 lambda 简明方便
-        [this](int _fd) {
-            new_connection(_fd);
-        }
-        */
+        // 可以使用 lambda
+        std::bind(&TcpServer::new_connection_callback, this, std::placeholders::_1)
     );
 }
 
 TcpServer::~TcpServer() {
     this->connections.clear();
-    // this->loop = nullptr;
-    // this->messageCallback = nullptr;
+    /* this->loop = nullptr;
+    this->messageCallback = nullptr; */
 }
 
 void TcpServer::start() {
     // EventLoop 开始循环时，Acceptor 会自动监听
 }
 
-void TcpServer::new_connection(int connFd) {
+
+
+void TcpServer::new_connection_callback(int connFd) {
     LOG::LOG_DEBUG("TcpServer::new_connection(). new connection created. fd is: %d", connFd);
 
+    // 初始化 conn
     auto conn = std::make_shared<TcpConnection>(loop, connFd);
-    conn->setMessageCallback(messageCallback);
-    conn->setCloseCallback([this](const std::shared_ptr<TcpConnection>& conn) {
+    conn->subscribe_message(this->messageCallback); // 设置业务层回调函数
+    conn->subscribe_close([this](const std::shared_ptr<TcpConnection>& conn) {
         remove_connection(conn);
         });
 
@@ -57,4 +53,8 @@ void TcpServer::new_connection(int connFd) {
 void TcpServer::remove_connection(const std::shared_ptr<TcpConnection>& conn) {
     int fd = conn->get_fd();
     connections.erase(fd);
+}
+
+void TcpServer::subscribe_message(MessageCallback cb) {
+    this->messageCallback = cb;
 }

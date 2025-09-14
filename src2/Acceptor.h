@@ -17,23 +17,28 @@ class Channel;
 class InetAddress;
 class Acceptor : public NonCopyable {
 private:
+    EventLoop* loop; // channel 应该也要注册进 poller
+
     int listenFd;
     InetAddress listenAddr;
     std::unique_ptr<Channel> channel;
-    EventLoop* loop; // channel 应该也要注册进 poller。在 muduo 的设计里, poller 并不拥有 channel
 
-    std::function<void(int)> newConnectionCallback; // 尽量单向依赖。上层(TcpServer)回调，上层拥有时初始化
+    std::function<void(int)> newConnectionCallback; // 单向依赖。保存上层 (TcpServer) 回调函数，上层拥有时初始化（订阅）
 
+    
 private:
-    void handle_read();
+    void read_callback(); // channel 的回调处理函数。Acceptor 只需要处理连接事件
+
     void create_fd();
     void bind_address();
-    void start_listen();
+    void listen_start();
+
+    void publish_new_connection(int connFd); // 发布给 TcpServer：新连接来了。消息格式是 int
 
 public:
     Acceptor(EventLoop* _loop, const InetAddress& _listenAddr);
     ~Acceptor();
 
-    // 设置回调。上层 TcpServer 调用，类似于订阅者订阅话题
-    void set_new_connection_callback(std::function<void(int)> cb) { newConnectionCallback = std::move(cb); }
+    void subscribe_new_connection(std::function<void(int)> cb); // 设置回调。上层 TcpServer 调用，类似于订阅者订阅话题
+
 };

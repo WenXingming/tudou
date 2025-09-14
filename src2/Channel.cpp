@@ -16,64 +16,49 @@ const int Channel::kReadEvent = EPOLLIN | EPOLLPRI;
 const int Channel::kWriteEvent = EPOLLOUT;
 
 Channel::Channel(EventLoop* _loop, int _fd)
-    : fd(_fd)
+    : loop(_loop)
+    , fd(_fd)
     , event(0)
     , revent(0)
-    , loop(_loop)
-    // , index(-1)
-    /* tiePtr(std::shared_ptr<void>(nullptr)), */ {}
+    , readCallback(nullptr)
+    , writeCallback(nullptr)
+    , closeCallback(nullptr)
+    , errorCallback(nullptr) {}
 
 Channel::~Channel() {}
 
-void Channel::handle_event(Timestamp receiveTime) {
-    if (!tiePtr.expired()) { // tiePtr.use_count() != 0
-        auto guard = tiePtr.lock();
-        if (guard) {
-            handle_event_with_guard(receiveTime);
-        }
-    }
-    else {
-        handle_event_with_guard(receiveTime);
-    }
+void Channel::publish_event(Timestamp receiveTime) {
+    publish_event_with_guard(receiveTime);
 }
 
-void Channel::handle_event_with_guard(Timestamp receiveTime) {
+void Channel::publish_event_with_guard(Timestamp receiveTime) {
     LOG::LOG_INFO("poller find event, then channel handle events: %d", revent);
 
     if ((revent & EPOLLHUP) && !(revent & EPOLLIN)) {
-        if (closeCallback) closeCallback();
+        this->publish_close();
         return;
     }
     if (revent & (EPOLLERR)) {
-        if (errorCallback) errorCallback();
+        this->publish_error();
         return;
     }
     if (revent & (EPOLLIN | EPOLLPRI)) {
-        if (readCallback) readCallback(receiveTime);
+        // if (readCallback) readCallback(/* receiveTime */);
+        this->publish_read();
     }
     if (revent & EPOLLOUT) {
-        if (writeCallback) writeCallback();
+        // if (writeCallback) writeCallback();
+        this->publish_write();
     }
-}
-
-
-
-/// @brief 在 poller 中把当前 channel 删除
-void Channel::remove() {
-    loop->remove_channel(this);
-}
-
-void Channel::update() {
-    loop->update_channel(this);
 }
 
 void Channel::enable_reading() {
-    event |= kReadEvent;
+    this->event |= Channel::kReadEvent;
     update();
 }
 
 void Channel::disable_reading() {
-    event &= ~kReadEvent;
+    this->event &= ~Channel::kReadEvent;
     update();
 }
 
@@ -92,9 +77,47 @@ void Channel::disable_all() {
     update();
 }
 
-/// @brief 弱智能指针监听某个 shared_ptr
-/// @details 何时被调用？
-void Channel::tie(const std::shared_ptr<void>& obj) {
-    tiePtr = obj;
-    // isTied = true;
+void Channel::update() {
+    loop->update_channel(this);
 }
+
+void Channel::subscribe_on_read(std::function<void(/* Timestamp */)> cb) {
+    this->readCallback = std::move(cb);
+}
+
+void Channel::subscribe_on_write(std::function<void()> cb) {
+    this->writeCallback = std::move(cb);
+}
+
+void Channel::subscribe_on_close(std::function<void()> cb) {
+    this->closeCallback = std::move(cb);
+}
+
+void Channel::subscribe_on_error(std::function<void()> cb) {
+    this->errorCallback = std::move(cb);
+}
+
+void Channel::publish_read() {
+    if (this->readCallback)
+        this->readCallback();
+    else LOG::LOG_ERROR("Channel::publish_read(). no readCallback.");
+}
+
+void Channel::publish_write() {
+    if (this->writeCallback)
+        this->writeCallback();
+    else LOG::LOG_ERROR("Channel::publish_write(). no writeCallback.");
+}
+
+void Channel::publish_close() {
+    if (this->closeCallback)
+        this->closeCallback();
+    else LOG::LOG_ERROR("Channel::publish_close(). no closeCallback.");
+}
+
+void Channel::publish_error() {
+    if (this->errorCallback)
+        this->errorCallback();
+    else LOG::LOG_ERROR("Channel::publish_error(). no errorCallback.");
+}
+

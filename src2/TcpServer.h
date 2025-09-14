@@ -27,19 +27,16 @@ private:
 
     MessageCallback messageCallback;
 
-private:
-    void new_connection(int sockfd); // Acceptor 的回调函数
 
+private:
+    void new_connection_callback(int sockfd); // Acceptor 的回调处理函数
     void remove_connection(const std::shared_ptr<TcpConnection>& conn);
 
 public:
-
     TcpServer(EventLoop* _loop, const InetAddress& _listenAddr);
     ~TcpServer();
 
     void start();
 
-    void setMessageCallback(MessageCallback cb) { messageCallback = std::move(cb); }
-
-
+    void subscribe_message(MessageCallback cb); // TcpConnection 发布。不是 TcpServer 发布，Server 只是作为消息传递中间商
 };

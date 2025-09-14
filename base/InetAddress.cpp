@@ -14,8 +14,8 @@ InetAddress::InetAddress(uint16_t _port, std::string _ip) {
     memset(&address, 0, sizeof(address));
     address.sin_family = AF_INET;
     address.sin_port = htons(_port);
-    address.sin_addr.s_addr = inet_addr(_ip.c_str()); // 基于字符串的地址初始化，返回网络序（大端）
-    // address.sin_addr.s_addr = htonl(INADDR_ANY);
+    // address.sin_addr.s_addr = inet_addr(_ip.c_str()); // 基于字符串的地址初始化，返回网络序（大端）
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
 }
 
 sockaddr_in InetAddress::get_sockaddr() const {

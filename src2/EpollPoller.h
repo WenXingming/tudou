@@ -14,12 +14,11 @@ class EpollPoller : public Poller {
 private:
     int epollFd;
 
-    const int initEventListSize = 16;
+    const int initEventListSize = 16; // 注意：声明在 eventList 之前（保证初始化顺序）
     std::vector<epoll_event> eventList;
 
 private:
     std::vector<Channel*> fill_activate_channels(int numEvents) const;
-    void update(int operation, Channel* channel);
 
 public:
     EpollPoller(EventLoop* _loop); // epoll_create()
@@ -31,5 +30,4 @@ public:
     /// @brief 维护注册中心 epollfd、channels。使用 epoll_ctl(), 包括 add、del、mod
     void update_channel(Channel* channel) override;
     void remove_channel(Channel* channel) override;
-
 };

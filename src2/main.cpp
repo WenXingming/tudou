@@ -6,17 +6,20 @@
  * @note My project address: https://github.com/WenXingming/Multi_IO
  */
 
-#include "EventLoop.h"
-#include "Channel.h"
-#include "TcpServer.h"
-#include "Buffer.h"
-#include "TcpConnection.h"
-#include "../base/Timestamp.h"
-#include "../base/Log.h"
 #include <iostream>
 #include <unistd.h>
 #include <cassert>
 #include <thread>
+
+#include "../base/Timestamp.h"
+#include "../base/Log.h"
+#include "../base/InetAddress.h"
+#include "Channel.h"
+#include "Buffer.h"
+#include "TcpConnection.h"
+
+#include "EventLoop.h"
+#include "TcpServer.h"
 
  /**
   * @brief 直接使用网络库功能进行测试。还没有封装上层 TcpServer
@@ -26,7 +29,7 @@ void test_netlib() {
 
     Channel stdinChannel(&loop, 0); // fd = 0 (标准输入)
     stdinChannel.enable_reading();
-    stdinChannel.set_read_callback([&](Timestamp receivetime) {
+    stdinChannel.subscribe_on_read([&](/* Timestamp receivetime */) {
         char buf[1024]{};
         ssize_t n = read(0, buf, sizeof(buf) - 1);
         if (n > 0) {
@@ -42,29 +45,37 @@ void test_netlib() {
 /**
  * @brief 测试上层 TcpServer
  */
- // void test_server() {
- //     EventLoop loop;
- //     TcpServer server(&loop, 8080);
+void test_server() {
+    EventLoop loop;
 
- //     server.setMessageCallback(
- //         [](const std::shared_ptr<TcpConnection>& conn, Buffer* buf) {
- //             std::string msg(buf->peek(), buf->readable_bytes());
- //             buf->retrieveAll();
- //             std::cout << "Received: " << msg << std::endl;
- //             conn->send(msg); // echo 回去
- //         }
- //     );
+    InetAddress listenAddr = InetAddress(8080);
+    TcpServer server(&loop, listenAddr);
 
- //     server.start();
- //     loop.loop();
- // }
+    server.subscribe_message(
+        [](const std::shared_ptr<TcpConnection>& conn, Buffer* buf) {
+            std::string msg(buf->peek(), buf->readable_bytes());
+            buf->retrieveAll();
+            std::cout << "Received: " << msg << std::endl;
+            // 业务处理 ...
+            // echo 回去
+            conn->send(msg);
+        }
+    );
+
+    server.start();
+    loop.loop();
+}
 
 int main() {
     // 日志系统
     LOG::disable_debug();
 
-    std::thread t(test_netlib);
-    t.join();
+    // std::thread t1(test_netlib);
+    // t1.join();
+
+    std::thread t2(test_server);
+    t2.join();
+
     return 0;
 }
 

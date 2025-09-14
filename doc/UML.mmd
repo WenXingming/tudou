@@ -1,0 +1,98 @@
+%%{init: {'theme':'default'}}%%
+classDiagram
+    direction TD
+
+    subgraph Reactor 核心
+        class EventLoop {
+            -std::unique_ptr<Poller> poller
+            +loop()
+            +update_channel(Channel* channel)
+            +remove_channel(Channel* channel)
+        }
+
+        class EPollPoller {
+            -int epollfd_
+            -const int initEventListSize = 16
+            -std::vector~struct epoll_event~ events_
+            +poll(int timeoutMs, ChannelList* activeChannels) Timestamp
+            +updateChannel(Channel*) override
+            +removeChannel(Channel*) override
+        }
+
+        class Channel {
+            -EventLoop* loop
+            -int fd
+            -int events
+            -int revents
+            -std::function readCallback
+            -std::function writeCallback
+            -std::function closeCallback
+            -std::function errorCallback
+            
+            -publish_read()
+            +subscribe_on_read(std::function cb)
+            -publish_write()
+            +subscribe_on_write(std::function cb)
+            -publish_close()
+            +subscribe_on_close(std::function cb)
+            -publish_error()
+            +subscribe_on_error(std::functioncb)
+        }
+    end
+
+    subgraph TCP 网络层
+        class TcpServer {
+            -EventLoop* loop_
+            -UniquePtr acceptor
+            -ConnectionMap connections
+            
+            -MessageCallback messageCallback
+            
+            subscribe_message(MessageCallback cb) // TcpConnection 发布。不是 TcpServer 发布，Server 只是作为消息传递中间商
+        }
+        
+        class Acceptor {
+            -EventLoop* loop
+            -int listenFd
+            -InetAddress listenAddr
+            -std::unique_ptr<Channel> channel
+            
+            -read_callback() // channel 的回调处理函数
+            -publish_new_connection(int connFd)
+            +subscribe_new_connection(std::function cb)
+        }
+
+        class TcpConnection {
+            -EventLoop* loop
+            int connectFd
+            unique_ptr channel
+            unique_ptr inputBuffer
+            unique_ptr outputBuffer
+            
+            MessageCallback messageCallback
+            CloseCallback closeCallback
+            
+            -read_callback()
+            -write_callback()
+            -close_callback()
+            
+            -publish_message()
+            -publish_close()
+            +subscribe_message(MessageCallback _cb)
+            +subscribe_close(CloseCallback _cb)
+        }
+
+        
+    end
+
+    %% -- 继承关系 --
+    
+    %% -- 组合/聚合关系 (拥有) --
+    EventLoop "1" *-- "1" EPollPoller: owns
+    EPollPoller "1" --> "n" Channel: tracks
+    
+    Acceptor "1" *-- "1" Channel: owns
+    TcpConnection "1" *-- "1" Channel: owns
+    
+    TcpServer "1" *-- "1" Acceptor: owns
+    TcpServer "1" *-- "n" TcpConnection: manages

@@ -14,7 +14,7 @@ public:
     ~Channel() = default;
 
     void handle_event(); // 由 EventLoop 调用
-    
+
 };
 
 // public:
@@ -31,9 +31,9 @@ public:
 //     void enable_writing() { event |= EPOLLOUT; }
 //     void disable_writing() { event &= ~EPOLLOUT; }
 
-//     void set_read_callback(EventCallback cb) { readCallback = std::move(cb); }
-//     void set_write_callback(EventCallback cb) { writeCallback = std::move(cb); }
-//     void set_close_callback(EventCallback cb) { closeCallback = std::move(cb); }
+//     void subscribe_on_read(EventCallback cb) { readCallback = std::move(cb); }
+//     void subscribe_on_write(EventCallback cb) { writeCallback = std::move(cb); }
+//     void subscribe_on_close(EventCallback cb) { closeCallback = std::move(cb); }
 
 //     void handle_event(); // 由 EventLoop 调用
 
