@@ -27,6 +27,7 @@ flowchart TD
         TcpServer
         Acceptor
         TcpConnnection
+
         %% Buffer
         %% TcpServer --> Acceptor 
         %% TcpServer --> TcpConnnection
@@ -35,8 +36,8 @@ flowchart TD
 
     subgraph Reactor
         EventLoop
-        Channel
         Poller
+        Channel
     end
 
     subgraph OS_Kernel
