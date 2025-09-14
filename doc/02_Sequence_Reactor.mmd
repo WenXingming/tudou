@@ -1,0 +1,49 @@
+%% %% 示例：在代码块顶部配置主题变量
+%% %%{init: {'theme':'forest'}}%%
+%% sequenceDiagram
+
+%%     participant EventLoop
+%%     participant Poller
+%%     participant Channel
+%%     participant TcpAcceptor
+%%     participant TcpConnection
+	
+%% 	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
+%% 	Poller->>EventLoop: 返回发生事件的 channels 给 eventLoop
+%% 	EventLoop->>Channel: eventloop 通知 channel 处理回调
+%% 	Channel->> TcpAcceptor: 根据事件进行回调
+%% 	Channel->> TcpConnection: 根据事件进行回调
+%% 	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
+
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+
+sequenceDiagram
+    title Reactor 反应堆时序图
+    
+    actor one
+    participant EventLoop
+    participant Poller
+    participant Channel
+    participant TcpAcceptor
+    participant TcpConnection
+	
+    one ->> EventLoop: loop()
+    loop
+	EventLoop->>Poller: poller→poll()
+
+    activate Poller
+    Poller->>Poller: fill_active_channels()
+    deactivate Poller
+    
+    Poller->>EventLoop: active channels
+	EventLoop->>Channel: channel→publish_event()
+	Channel->> TcpAcceptor: publish_read()
+	Channel->> TcpConnection: publish_read()、close()...
+    end
+	EventLoop->>Poller: poller→poll()

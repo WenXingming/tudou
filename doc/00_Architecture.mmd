@@ -1,0 +1,42 @@
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+
+flowchart TD
+    subgraph AppBusiness[App 业务层]
+        onConn["onConnection(conn)"]
+        onMsg["onMessage(conn, buffer)"]
+        onWrite["onWriteComplete(conn)"]
+    end
+
+    subgraph NetLayer
+        TcpServer
+        Acceptor
+        TcpConnnection
+        Buffer
+        %% TcpServer --> Acceptor 
+        %% TcpServer --> TcpConnnection
+        TcpConnnection -.-> Buffer
+    end
+
+    subgraph Reactor
+        EventLoop
+        Channel
+        Poller
+    end
+
+    subgraph OS_Kernel
+        epoll["epoll / socket API"]
+    end
+
+    %% 应用层注册回调
+    %% AppBusiness -->|注册回调| TcpServer
+    AppBusiness -->|注册回调| NetLayer
+    NetLayer --> Reactor
+    Reactor --> OS_Kernel
+    %% TcpConnnection --> Channel --> EventLoop --> Poller --> epoll
+    %% AppBusiness --> NetLayer --> Reactor --> OS_Kernel

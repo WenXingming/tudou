@@ -1,4 +1,11 @@
-%%{init: {'theme':'default'}}%%
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+
 classDiagram
     direction TD
 
@@ -48,7 +55,7 @@ classDiagram
             
             -MessageCallback messageCallback
             
-            subscribe_message(MessageCallback cb) // TcpConnection 发布。不是 TcpServer 发布，Server 只是作为消息传递中间商
+            +subscribe_message(MessageCallback cb) // 中间者
         }
         
         class Acceptor {

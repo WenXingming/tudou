@@ -37,7 +37,13 @@
 %%     publish_message -.中介.-> TcpServer -.中介.-> 业务层
 %%     publish_close_2 -.-> TcpServer
 
-%%{init: {'theme':'default'}}%%
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
 graph TD
     %% 定义发布者节点
     Channel(Channel)
