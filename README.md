@@ -1,38 +1,255 @@
 # Reactor 模式的 IO 多路复用
 
-```mermaid
-sequenceDiagram
+## Reactor 模式
 
+![Reactor](/doc/Reactor.png)
+
+## 系统架构图
+
+```mermaid
+
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+
+flowchart TD
+    subgraph AppBusiness[App 业务层]
+        onConn["onConnection(conn)"]
+        onMsg["onMessage(conn, buffer)"]
+        onWrite["onWriteComplete(conn)"]
+    end
+
+    subgraph NetLayer
+        TcpServer
+        Acceptor
+        TcpConnnection
+        %% Buffer
+        %% TcpServer --> Acceptor 
+        %% TcpServer --> TcpConnnection
+        %% TcpConnnection -.-> Buffer
+    end
+
+    subgraph Reactor
+        EventLoop
+        Channel
+        Poller
+    end
+
+    subgraph OS_Kernel
+        epoll["epoll / socket API"]
+    end
+
+    %% 应用层注册回调
+    %% AppBusiness -->|注册回调| TcpServer
+    AppBusiness -->|注册回调| NetLayer
+    NetLayer --> Reactor
+    Reactor --> OS_Kernel
+    %% TcpConnnection --> Channel --> EventLoop --> Poller --> epoll
+    %% AppBusiness --> NetLayer --> Reactor --> OS_Kernel
+
+```
+
+## UML 类图
+
+```mermaid
+
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+
+classDiagram
+    direction TD
+
+    subgraph Reactor 核心
+        class EventLoop {
+            -std::unique_ptr<Poller> poller
+            +loop()
+            +update_channel(Channel* channel)
+            +remove_channel(Channel* channel)
+        }
+
+        class EPollPoller {
+            -int epollfd_
+            -const int initEventListSize = 16
+            -std::vector~struct epoll_event~ events_
+            +poll(int timeoutMs, ChannelList* activeChannels) Timestamp
+            +updateChannel(Channel*) override
+            +removeChannel(Channel*) override
+        }
+
+        class Channel {
+            -EventLoop* loop
+            -int fd
+            -int events
+            -int revents
+            -std::function readCallback
+            -std::function writeCallback
+            -std::function closeCallback
+            -std::function errorCallback
+            
+            -publish_read()
+            +subscribe_on_read(std::function cb)
+            -publish_write()
+            +subscribe_on_write(std::function cb)
+            -publish_close()
+            +subscribe_on_close(std::function cb)
+            -publish_error()
+            +subscribe_on_error(std::functioncb)
+        }
+    end
+
+    subgraph TCP 网络层
+        class TcpServer {
+            -EventLoop* loop_
+            -UniquePtr acceptor
+            -ConnectionMap connections
+            
+            -MessageCallback messageCallback
+            
+            +subscribe_message(MessageCallback cb) // 中间者
+        }
+        
+        class Acceptor {
+            -EventLoop* loop
+            -int listenFd
+            -InetAddress listenAddr
+            -std::unique_ptr<Channel> channel
+            
+            -read_callback() // channel 的回调处理函数
+            -publish_new_connection(int connFd)
+            +subscribe_new_connection(std::function cb)
+        }
+
+        class TcpConnection {
+            -EventLoop* loop
+            int connectFd
+            unique_ptr channel
+            unique_ptr inputBuffer
+            unique_ptr outputBuffer
+            
+            MessageCallback messageCallback
+            CloseCallback closeCallback
+            
+            -read_callback()
+            -write_callback()
+            -close_callback()
+            
+            -publish_message()
+            -publish_close()
+            +subscribe_message(MessageCallback _cb)
+            +subscribe_close(CloseCallback _cb)
+        }
+
+        
+    end
+
+    %% -- 继承关系 --
+    
+    %% -- 组合/聚合关系 (拥有) --
+    EventLoop "1" *-- "1" EPollPoller: owns
+    EPollPoller "1" --> "n" Channel: tracks
+    
+    Acceptor "1" *-- "1" Channel: owns
+    TcpConnection "1" *-- "1" Channel: owns
+    
+    TcpServer "1" *-- "1" Acceptor: owns
+    TcpServer "1" *-- "n" TcpConnection: manages
+
+```
+
+## Reactor 模块时序图
+
+```mermaid
+
+%% %% 示例：在代码块顶部配置主题变量
+%% %%{init: {'theme':'forest'}}%%
+%% sequenceDiagram
+
+%%     participant EventLoop
+%%     participant Poller
+%%     participant Channel
+%%     participant TcpAcceptor
+%%     participant TcpConnection
+	
+%% 	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
+%% 	Poller->>EventLoop: 返回发生事件的 channels 给 eventLoop
+%% 	EventLoop->>Channel: eventloop 通知 channel 处理回调
+%% 	Channel->> TcpAcceptor: 根据事件进行回调
+%% 	Channel->> TcpConnection: 根据事件进行回调
+%% 	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
+
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+
+sequenceDiagram
+    title Reactor 反应堆时序图
+    
+    actor one
     participant EventLoop
     participant Poller
     participant Channel
     participant TcpAcceptor
     participant TcpConnection
 	
-	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
-	Poller->>EventLoop: 返回发生事件的 channels 给 eventLoop
-	EventLoop->>Channel: eventloop 通知 channel 处理回调
-	Channel->> TcpAcceptor: 根据事件进行回调
-	Channel->> TcpConnection: 根据事件进行回调
-	EventLoop->>Poller: 使用 poller 监听发生事件的 channels
+    one ->> EventLoop: loop()
+    loop
+	EventLoop->>Poller: poller→poll()
+
+    activate Poller
+    Poller->>Poller: fill_active_channels()
+    deactivate Poller
     
+    Poller->>EventLoop: active channels
+	EventLoop->>Channel: channel→publish_event()
+	Channel->> TcpAcceptor: publish_read()
+	Channel->> TcpConnection: publish_read()、close()...
+    end
+	EventLoop->>Poller: poller→poll()
+
 ```
 
-![Reactor](/doc/Reactor.png)
+## Callback 流向图
 
-一个典型的 Reactor 系统有几个核心组件：
+```mermaid
 
-| 组件									| 作用                         |
-| -----------------						| -------------------------- |
-| **Reactor (EventLoop)**             	| 事件循环，监听事件源并分发事件            |
-| **Demultiplexer (epoll)**       		| I/O 多路复用工具（select、epoll 等） |
-| **Handle (Connection)**              	| 事件源的抽象，比如 socket 连接        |
-| **Event Handler (EventHandler)**      | 事件处理器，真正处理业务逻辑             |
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+graph TD
+    %% 定义发布者节点
+    Channel(Channel)
+    Acceptor(Acceptor)
+    TcpConnection(TcpConnection)
+    TcpServer(TcpServer)
 
 
-工作流程：
+    Channel -.publish_read.-> Acceptor
+    Channel -.publish_read.-> TcpConnection
+    Channel -.publish_write.-> TcpConnection
+    Channel -.publish_close.-> TcpConnection
+    Channel -.publish_error.-> TcpConnection
+    
+    Acceptor -.publish_new_connection.-> TcpServer
+    TcpConnection -.publish_message(中介).-> TcpServer
+    TcpConnection -.publish_close.-> TcpServer
+    
+    TcpServer -.publish_message.-> 业务层
 
-1. Reactor 进行事件循环（通过使用 epoll 等 IO 多路复用工具）。
-2. Demultiplexer 检测到某个 Handle 上有事件发生。
-3. Reactor 调用对应的 handle_event 来处理。
-4. Connection 调用回调函数，处理具体的业务逻辑（EventHandler 封装好的业务逻辑函数）。
+```
