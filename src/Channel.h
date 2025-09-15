@@ -32,14 +32,14 @@ private:
     std::function<void()> errorCallback;
 
 private:
+    void publish_event_with_guard(Timestamp receiveTime); // 根据事件调用回调函数。何时被调用：被 publish_event() 调用
+
     void publish_read(); // 事件发生了就需要 publish。没有 master 注册中心，所以发布时直接本地自己触发回调 callback
     void publish_write();
     void publish_close();
     void publish_error();
 
     void update(); // 当改变 channel 的 event 后，需要在 poller 里面更改（更新） channel。何时被调用：调用 enable_reading 等函数改变 event 后
-
-    void publish_event_with_guard(Timestamp receiveTime); // 根据事件调用回调函数。何时被调用：被 publish_event() 调用
 
 public:
     explicit Channel(EventLoop* loop, int fd);

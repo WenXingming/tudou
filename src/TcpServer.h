@@ -17,7 +17,7 @@ class TcpConnection;
 class Buffer;
 class InetAddress;
 class TcpServer {
-    using MessageCallback = std::function<void(const std::shared_ptr<TcpConnection>&, Buffer*)>;
+    using MessageCallback = std::function<void(const std::shared_ptr<TcpConnection>&)>;
 
 private:
     std::unique_ptr<Acceptor> acceptor;
@@ -30,6 +30,7 @@ private:
 
 private:
     void new_connection_callback(int sockfd); // Acceptor 的回调处理函数
+    void close_callback(const std::shared_ptr<TcpConnection>& conn); // TcpConnection 的回调函数
     void remove_connection(const std::shared_ptr<TcpConnection>& conn);
 
 public:

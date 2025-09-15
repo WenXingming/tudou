@@ -73,8 +73,8 @@ classDiagram
             -EventLoop* loop
             int connectFd
             unique_ptr channel
-            unique_ptr inputBuffer
-            unique_ptr outputBuffer
+            unique_ptr readBuffer
+            unique_ptr writeBuffer
             
             MessageCallback messageCallback
             CloseCallback closeCallback

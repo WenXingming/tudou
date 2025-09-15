@@ -22,12 +22,12 @@ Acceptor::Acceptor(EventLoop* _loop, const InetAddress& _listenAddr) // 构造�
     this->bind_address();
     this->listen_start();
 
-    // 初始化 channel
+    // 初始化 channel. 也可以放在初始化列表里，但注意初始化顺序（依赖 listenFd）
     // 注意：创建 channel 后需要设置 intesting event 和 订阅（发生事件后的回调函数）；并注册到 poller
-    this->channel.reset(new Channel(this->loop, this->listenFd)); // 也可以放在初始化列表里，但注意初始化顺序（依赖 listenFd）
-    this->channel->subscribe_on_read(std::bind(&Acceptor::read_callback, this));
+    this->channel.reset(new Channel(this->loop, this->listenFd));
     this->channel->enable_reading();
-    this->loop->update_channel(channel.get()); // 其实 enable_reading() 已经注册进了 poller，这里又注册到 poller 了一次（还是不要省，只要 channel 改变就 update。虽然理论上只有 event 改变需要调用）
+    this->channel->subscribe_on_read(std::bind(&Acceptor::read_callback, this));
+    this->loop->update_channel(channel.get());
 }
 
 Acceptor::~Acceptor() {

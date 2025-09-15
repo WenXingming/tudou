@@ -24,16 +24,16 @@ void Logger::set_log_level(LogLevel level) {
 void Logger::log(std::string msg) {
     switch (this->logLevel) {
     case LogLevel::INFO:
-        std::cout << "[INFO]:";
+        std::cout << "[INFO]: ";
         break;
     case LogLevel::ERROR:
-        std::cout << "[ERROR]:";
+        std::cout << "[ERROR]: ";
         break;
     case LogLevel::FATAL:
-        std::cout << "[FATAL]:";
+        std::cout << "[FATAL]: ";
         break;
     case LogLevel::DEBUG:
-        std::cout << "[DEBUG]:";
+        std::cout << "[DEBUG]: ";
         break;
     default:
         break;
@@ -42,6 +42,5 @@ void Logger::log(std::string msg) {
     // 打印时间和 msg
     // 获取时间
     auto now = std::chrono::system_clock::now();
-
-    std::cout << "time: " << Timestamp::now().timestamp_to_string() << " message: " << msg << std::endl;
+    std::cout << Timestamp(now).timestamp_to_string() << ". message: " << msg << std::endl;
 }

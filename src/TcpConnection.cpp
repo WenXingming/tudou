@@ -12,18 +12,19 @@
 TcpConnection::TcpConnection(EventLoop* _loop, int _connFd)
     : loop(_loop)
     , connectFd(_connFd)
-    , inputBuffer(new Buffer())
-    , outputBuffer(new Buffer())
+    , readBuffer(new Buffer())
+    , writeBuffer(new Buffer())
     , messageCallback(nullptr)
     , closeCallback(nullptr) {
 
-    // 初始化 channel
+    // 初始化 channel. 也可以放在初始化列表里，但注意初始化顺序（如果依赖 this->成员变量的话）
+    // 创建 channel 后需要设置 intesting event 和 订阅（发生事件后的回调函数）；并注册到 poller
     channel.reset(new Channel(_loop, _connFd)); // 也可以用 this->loop、this->connectFd, 因为初始化列表先执行。知道为什么初始化列表先执行吗？突然发现可能就是为了构造函数使用 this...
+    channel->enable_reading();
     channel->subscribe_on_read(std::bind(&TcpConnection::read_callback, this));
     channel->subscribe_on_write([this]() { this->write_callback(); });
     channel->subscribe_on_close([this]() { this->close_callback(); });
     channel->subscribe_on_error([this]() { this->error_callback(); });
-    channel->enable_reading();
     loop->update_channel(channel.get());
 }
 
@@ -35,9 +36,17 @@ TcpConnection::~TcpConnection() {
     }
 }
 
+Buffer* TcpConnection::get_input_buffer() {
+    return this->readBuffer.get();
+}
+
+Buffer* TcpConnection::get_output_buffer() {
+    return this->writeBuffer.get();
+}
+
 void TcpConnection::read_callback() {
     int savedErrno = 0;
-    ssize_t n = inputBuffer->readFd(this->connectFd, &savedErrno);
+    ssize_t n = readBuffer->read_from_fd(this->connectFd, &savedErrno);
     if (n > 0) {
         this->publish_message();
     }
@@ -52,9 +61,9 @@ void TcpConnection::read_callback() {
 
 void TcpConnection::write_callback() {
     int savedErrno = 0;
-    ssize_t n = outputBuffer->writeFd(this->connectFd, &savedErrno);
+    ssize_t n = writeBuffer->write_to_fd(this->connectFd, &savedErrno);
     if (n > 0) {
-        if (outputBuffer->readable_bytes() == 0) {
+        if (writeBuffer->readable_bytes() == 0) {
             channel->disable_writing();
         }
     }
@@ -79,7 +88,7 @@ void TcpConnection::error_callback() {
 
 void TcpConnection::publish_message() {
     if (messageCallback) {
-        messageCallback(shared_from_this(), inputBuffer.get());
+        messageCallback(shared_from_this());
     }
     else LOG::LOG_ERROR("TcpConnection::publish_message(). no messageCallback setted.");
 }
@@ -100,8 +109,13 @@ void TcpConnection::subscribe_close(CloseCallback _cb) {
 }
 
 void TcpConnection::send(const std::string& msg) {
-    outputBuffer->append(msg);
+    writeBuffer->write_to_buffer(msg);
     channel->enable_writing();
+}
+
+std::string TcpConnection::recv() {
+    std::string msg(readBuffer->read_from_buffer());
+    return std::move(msg);
 }
 
 /* void TcpConnection::shutdown() {

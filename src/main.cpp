@@ -52,9 +52,8 @@ void test_server() {
     TcpServer server(&loop, listenAddr);
 
     server.subscribe_message(
-        [](const std::shared_ptr<TcpConnection>& conn, Buffer* buf) {
-            std::string msg(buf->peek(), buf->readable_bytes());
-            buf->retrieveAll();
+        [](const std::shared_ptr<TcpConnection>& conn) {
+            std::string msg(conn->recv());
             std::cout << "Received: " << msg << std::endl;
             // 业务处理 ...
             // echo 回去
