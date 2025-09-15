@@ -131,13 +131,13 @@ classDiagram
 
         class TcpConnection {
             -EventLoop* loop
-            int connectFd
-            unique_ptr channel
-            unique_ptr inputBuffer
-            unique_ptr outputBuffer
+            -int connectFd
+            -unique_ptr channel
+            -unique_ptr readBuffer
+            -unique_ptr writeBuffer
             
-            MessageCallback messageCallback
-            CloseCallback closeCallback
+            -MessageCallback messageCallback
+            -CloseCallback closeCallback
             
             -read_callback()
             -write_callback()
@@ -149,7 +149,18 @@ classDiagram
             +subscribe_close(CloseCallback _cb)
         }
 
-        
+        class Buffer {
+            -std::vector~char~ buffer;
+            -size_t readIndex;
+            -size_t writeIndex;
+
+            +read_from_buffer() std::string 
+            +write_to_buffer(const char* data, size_t len)
+            +write_to_buffer(const std::string& str)
+
+            +ssize_t read_from_fd(int fd, int* savedErrno)
+            +ssize_t write_to_fd(int fd, int* savedErrno)
+        }
     end
 
     %% -- 继承关系 --
@@ -160,6 +171,7 @@ classDiagram
     
     Acceptor "1" *-- "1" Channel: owns
     TcpConnection "1" *-- "1" Channel: owns
+    TcpConnection "1" *-- "1" Buffer: owns
     
     TcpServer "1" *-- "1" Acceptor: owns
     TcpServer "1" *-- "n" TcpConnection: manages
