@@ -19,7 +19,7 @@ private:
     EventLoop* ownLoop; // poller 所属的 EventLoop。子类 poller 暂时无需依赖，所以 private
 
 protected:
-    std::unordered_map<int, Channel*> channels; // 子类需要使用，所以 protected
+    // std::unordered_map<int, Channel*> channels; // 子类需要使用，所以 protected
 
 public:
     Poller(EventLoop* _loop) : ownLoop(_loop) {}; // 构造函数不能是 virtual。只有当对象被构造完成，vptr 指针被正确设置后，虚函数的机制才能正常工作。

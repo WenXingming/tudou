@@ -12,9 +12,10 @@
 
 class EpollPoller : public Poller {
 private:
-    int epollFd;
+    std::unordered_map<int, Channel*> channels; // fd 到 channel 的映射，作为注册中心
 
-    const int initEventListSize = 16; // 注意：声明在 eventList 之前（保证初始化顺序）
+    int epollFd;
+    const int eventListSize = 16; // 注意：声明在 eventList 之前（保证初始化顺序）
     std::vector<epoll_event> eventList;
 
 private:

@@ -2,7 +2,7 @@
  * @file EventLoop.h
  * @brief 事件循环类，负责事件循环
  * @author wenxingming
- * @note My project address: https://github.com/WenXingming/Multi_IO
+ * @note My project address: https://github.com/WenXingming/tudou
  */
 
 #pragma once

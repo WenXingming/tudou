@@ -1,8 +1,27 @@
 /**
  * @file Channel.h
- * @brief 理解为事件的抽象，包含 event、revent、回调函数。可以用于事件发生后的回调处理
+ * @brief Channel 用于把 IO 事件与回调绑定起来的抽象。
+ *
+ * 主要职责：
+ *  - 表示某个 fd 对应的“感兴趣事件”（event）和 poller 返回的“发生事件”（revent）。
+ *  - 保存该 fd 在可读/可写/关闭/错误等情况下需要触发的回调函数。
+ *  - 在事件发生时（EventLoop 从 Poller 得到活动事件并设置 revent），
+ *    调用 publish_event，按 revent 分发并触发相应的回调。
+ *  - 当对感兴趣事件做修改（enable/disable）时，通过 update 通知 EventLoop/ Poller 更新注册信息。
+ *
+ * 重要注意点：
+ *  - Channel 不拥有 fd（不负责 close）；仅做事件/回调的绑定与分发。
+ *  - Channel 依赖 EventLoop 来完成与 Poller 的交互（注册/更新/删除）。
+ *  - 回调以 std::function<void()> 保存，用户需在外部捕获必要上下文（例如 shared_ptr 保持生命周期）。
+ *
+ * 用法概览：
+ *  1. 创建 Channel 并传入所属的 EventLoop 和 fd。
+ *  2. subscribe_on_* 注册对应事件的回调函数。
+ *  3. 调用 enable_reading/enable_writing 等修改感兴趣事件。
+ *  4. EventLoop 在 poller 返回活动 events 时，设置 revent 并调用 publish_event。
+ *
  * @author wenxingming
- * @note My project address: https://github.com/WenXingming/Multi_IO
+ * @note My project address: https://github.com/WenXingming/tudou
  */
 
 #pragma once
@@ -16,10 +35,6 @@ class Timestamp;
 class EventLoop;
 class Channel : public NonCopyable {
 private:
-    static const int kNoneEvent;
-    static const int kReadEvent;
-    static const int kWriteEvent;
-
     EventLoop* loop;    // 改变 channel 的 event 后，需要更新 channels 注册中心（在 poller），依赖 loop 完成（依赖注入设计）
 
     int fd;             // 并不持有，无需负责 close
@@ -30,6 +45,10 @@ private:
     std::function<void()> writeCallback;
     std::function<void()> closeCallback;
     std::function<void()> errorCallback;
+
+    static const int kNoneEvent;
+    static const int kReadEvent;
+    static const int kWriteEvent;
 
 private:
     void publish_event_with_guard(Timestamp receiveTime); // 根据事件调用回调函数。何时被调用：被 publish_event() 调用
@@ -47,8 +66,8 @@ public:
 
     void publish_event(Timestamp receiveTime); // 核心函数，事件发生后进行回调。何时被调用：EventLoop 事件循环中被调用（先通过 poller 返回活动 channels）
 
-
-    void subscribe_on_read(std::function<void()> cb); // 没有办法，没有 master 注册中心，只能把订阅函数 callback 存在本类里，所以也需要提供公开接口
+    // 没有办法，没有 master 注册中心，只能把订阅函数 callback 存在本类里，所以也需要提供公开接口
+    void subscribe_on_read(std::function<void()> cb);
     void subscribe_on_write(std::function<void()> cb);
     void subscribe_on_close(std::function<void()> cb);
     void subscribe_on_error(std::function<void()> cb);

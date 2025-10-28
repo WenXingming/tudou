@@ -47,17 +47,27 @@ void test_netlib() {
  */
 void test_server() {
     EventLoop loop;
-
     InetAddress listenAddr = InetAddress(8080);
     TcpServer server(&loop, listenAddr);
 
     server.subscribe_message(
         [](const std::shared_ptr<TcpConnection>& conn) {
             std::string msg(conn->recv());
-            std::cout << "Received: " << msg << std::endl;
+            // std::cout << "Received: " << msg << std::endl;
             // 业务处理 ...
+            // http 解析
+            char writeBuffer[1024] = {};
+            int writeLength = 1024;
+            writeLength = sprintf(writeBuffer,
+                "HTTP/1.1 200 OK\r\n"
+                "Accept-Ranges: bytes\r\n"
+                "Content-Length: 90\r\n"
+                "Content-Type: text/html\r\n"
+                "Date: Sat, 06 Aug 2022 13:16:46 GMT\r\n\r\n"
+                "<html><head><title>0voice.king</title></head><body><h1>Hello, World</h1></body></html>\r\n\r\n");
             // echo 回去
-            conn->send(msg);
+            // conn->send(msg);
+            conn->send(std::string(writeBuffer));
         }
     );
 
@@ -67,7 +77,7 @@ void test_server() {
 
 int main() {
     // 日志系统
-    LOG::disable_debug();
+    // LOG::disable_debug();
 
     // std::thread t1(test_netlib);
     // t1.join();

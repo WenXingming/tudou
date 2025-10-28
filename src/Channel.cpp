@@ -32,7 +32,7 @@ void Channel::publish_event(Timestamp receiveTime) {
 }
 
 void Channel::publish_event_with_guard(Timestamp receiveTime) {
-    LOG::LOG_INFO("poller find event, channel publish event: %d", revent);
+    LOG::LOG_DEBUG("poller find event, channel publish event: %d", revent);
 
     if ((revent & EPOLLHUP) && !(revent & EPOLLIN)) {
         this->publish_close();

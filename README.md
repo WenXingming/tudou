@@ -79,7 +79,7 @@ classDiagram
 
         class EPollPoller {
             -int epollfd_
-            -const int initEventListSize = 16
+            -const int eventListSize = 16
             -std::vector~struct epoll_event~ events_
             +poll(int timeoutMs, ChannelList* activeChannels) Timestamp
             +updateChannel(Channel*) override

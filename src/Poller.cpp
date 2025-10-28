@@ -9,12 +9,12 @@
 #include "EpollPoller.h"
 
 bool Poller::has_channel(const Channel* channel) const {
-    auto it = channels.find(channel->get_fd());
-    if (it != channels.end()) {
-        assert(it->second == channel);
-        return true;
-    }
-    else return false;
+    // auto it = channels.find(channel->get_fd());
+    // if (it != channels.end()) {
+    //     assert(it->second == channel);
+    //     return true;
+    // }
+    // else return false;
 }
 
 Poller* Poller::new_default_poller(EventLoop* loop) {

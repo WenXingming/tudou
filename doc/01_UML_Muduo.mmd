@@ -19,7 +19,7 @@ classDiagram
 
         class EPollPoller {
             -int epollfd_
-            -const int initEventListSize = 16
+            -const int eventListSize = 16
             -std::vector~struct epoll_event~ events_
             +poll(int timeoutMs, ChannelList* activeChannels) Timestamp
             +updateChannel(Channel*) override
@@ -98,8 +98,8 @@ classDiagram
             +write_to_buffer(const char* data, size_t len)
             +write_to_buffer(const std::string& str)
 
-            +ssize_t read_from_fd(int fd, int* savedErrno)
-            +ssize_t write_to_fd(int fd, int* savedErrno)
+            +read_from_fd(int fd, int* savedErrno) ssize_t 
+            +write_to_fd(int fd, int* savedErrno) ssize_t
         }
     end
 

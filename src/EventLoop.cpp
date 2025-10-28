@@ -18,18 +18,25 @@
 #include "Poller.h"
 #include "Channel.h"
 
+static int s_PollTimeoutMs = 5000;
+
 EventLoop::EventLoop()
     : poller(Poller::new_default_poller(this))
-    , pollTimeoutMs(5000) {}
+    , pollTimeoutMs(s_PollTimeoutMs) {
+
+}
 
 
-EventLoop::~EventLoop() {}
+EventLoop::~EventLoop() {
+
+}
 
 
 void EventLoop::loop() {
-    LOG::LOG_INFO("EventLoop start looping...");
+    LOG::LOG_DEBUG("EventLoop start looping...");
+
     while (true) {
-        LOG::LOG_INFO("EventLoop is looping...");
+        LOG::LOG_DEBUG("EventLoop is looping...");
 
         // 使用 poller 监听发生事件的 channels
         std::vector<Channel*> activeChannels = this->poller->poll(this->pollTimeoutMs);
@@ -39,7 +46,8 @@ void EventLoop::loop() {
             channel->publish_event(Timestamp::now()); // 也监听了 wakeupFd
         }
     }
-    LOG::LOG_INFO("EventLoop stop looping.");
+
+    LOG::LOG_DEBUG("EventLoop stop looping.");
 }
 
 

@@ -17,10 +17,10 @@ static const int kDeleted = 2;
 EpollPoller::EpollPoller(EventLoop* _loop)
     : Poller(_loop) // 先调用基类构造函数。loop 派生类并没有用到，所以在基类里面是 private
     , epollFd(epoll_create1(EPOLL_CLOEXEC))
-    , initEventListSize(16) // 注意初始化顺序和声明顺序保持一致，先初始化 initEventListSize
-    , eventList(initEventListSize) {
+    , eventListSize(16) // 注意初始化顺序和声明顺序保持一致，先初始化 eventListSize
+    , eventList(eventListSize) {
 
-    eventList.resize(initEventListSize); // 保留手段，保证初始化
+    eventList.resize(eventListSize); // 保留手段，保证初始化
     if (epollFd < 0) {
         LOG::LOG_FATAL("EpollPoller::EpollPoller(). Failed to create epoll fd: %d", errno);
     }
@@ -35,14 +35,13 @@ EpollPoller::~EpollPoller() {
 
 std::vector<Channel*> EpollPoller::poll(int timeoutMs) {
     LOG::LOG_DEBUG("EpollPoller::poll(). epoll is running... poller monitors channels's size is: %d", channels.size());
-    std::vector<Channel*> activeChannels;
 
-    int numReady = epoll_wait(epollFd, eventList.data() /* &eventList[0] */ /* &*eventList.begin() */, static_cast<int>(eventList.size()), timeoutMs);
+    std::vector<Channel*> activeChannels;
+    int numReady = epoll_wait(epollFd, eventList.data(), static_cast<int>(eventList.size()), timeoutMs); // eventList.data() 可以写作 &eventList[0] 或 &*eventList.begin() 
     if (numReady > 0) {
         LOG::LOG_DEBUG("EpollPoller::poll(). epoll is running...  activeChannels's size is: %d", numReady);
 
-        // 注意不是 resize()! 不然后续 loop 遍历 activeChannels 时很可能非法访问！
-        activeChannels.reserve(numReady);
+        activeChannels.reserve(numReady); // reserve() 是为了避免多次内存分配。注意不是 resize()，否则后续调用 push_back() 填充，会导致前面部分是空指针，访问错误
         activeChannels = fill_activate_channels(numReady);
 
         // eventList 自动扩容（可能有更多的事件发生, eventList 放不下）和缩减
