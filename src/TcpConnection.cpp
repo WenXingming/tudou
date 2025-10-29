@@ -17,9 +17,9 @@ TcpConnection::TcpConnection(EventLoop* _loop, int _connFd)
     , messageCallback(nullptr)
     , closeCallback(nullptr) {
 
-    // 初始化 channel. 也可以放在初始化列表里，但注意初始化顺序（如果依赖 this->成员变量的话）
+    // 初始化 channel. 也可以放在初始化列表里，但注意初始化顺序（如果依赖其他成员变量的话）
     // 创建 channel 后需要设置 intesting event 和 订阅（发生事件后的回调函数）；并注册到 poller
-    channel.reset(new Channel(_loop, _connFd)); // 也可以用 this->loop、this->connectFd, 因为初始化列表先执行。知道为什么初始化列表先执行吗？突然发现可能就是为了构造函数使用 this...
+    channel.reset(new Channel(_loop, _connFd, 0, 0, nullptr, nullptr, nullptr, nullptr));
     channel->enable_reading();
     channel->subscribe_on_read(std::bind(&TcpConnection::read_callback, this));
     channel->subscribe_on_write([this]() { this->write_callback(); });

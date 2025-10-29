@@ -15,20 +15,19 @@ private:
     std::unordered_map<int, Channel*> channels; // fd 到 channel 的映射，作为注册中心
 
     int epollFd;
-    const int eventListSize = 16; // 注意：声明在 eventList 之前（保证初始化顺序）
-    std::vector<epoll_event> eventList;
+    const int eventListSize = 16; // 注意：声明在 eventList 之前（保证初始化列表中的初始化顺序）
+    std::vector<epoll_event> eventList; // 用于存放 epoll_wait 返回的就绪事件列表
 
 private:
-    std::vector<Channel*> fill_activate_channels(int numEvents) const;
+    std::vector<Channel*> get_activate_channels(int numEvents) const;
+    void event_list_auto_resize(int numReady);
 
 public:
     EpollPoller(EventLoop* _loop); // epoll_create()
     ~EpollPoller() override;
 
-    /// @brief 返回 activeChannels。使用 epoll_wait()
     std::vector<Channel*> poll(int timeoutMs) override;
 
-    /// @brief 维护注册中心 epollfd、channels。使用 epoll_ctl(), 包括 add、del、mod
     void update_channel(Channel* channel) override;
     void remove_channel(Channel* channel) override;
 };

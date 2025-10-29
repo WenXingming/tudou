@@ -39,7 +39,7 @@ private:
 
     int fd;             // 并不持有，无需负责 close
     uint32_t event;     // interesting events
-    uint32_t revent;    // received events types of poller, channel 调用 publish_event 时也根据 revent 进行事件分发回调
+    uint32_t revent;    // received events types of poller, channel 调用 publish_events 时根据 revent 进行事件分发回调
 
     std::function<void()> readCallback; // 根据 revents 调用事件的回调函数。没有 master，所以存放在这里
     std::function<void()> writeCallback;
@@ -51,9 +51,10 @@ private:
     static const int kWriteEvent;
 
 private:
-    void publish_event_with_guard(Timestamp receiveTime); // 根据事件调用回调函数。何时被调用：被 publish_event() 调用
+    void publish_events_with_guard(Timestamp receiveTime); // 根据事件调用回调函数。何时被调用：被 publish_events() 调用
 
-    void publish_read(); // 事件发生了就需要 publish。没有 master 注册中心，所以发布时直接本地自己触发回调 callback
+    // 事件发生了就需要 publish。没有 master 注册中心，所以发布时直接本地自己触发回调 callback
+    void publish_read();
     void publish_write();
     void publish_close();
     void publish_error();
@@ -61,10 +62,14 @@ private:
     void update(); // 当改变 channel 的 event 后，需要在 poller 里面更改（更新） channel。何时被调用：调用 enable_reading 等函数改变 event 后
 
 public:
-    explicit Channel(EventLoop* loop, int fd);
+    explicit Channel(EventLoop* loop, int fd, uint32_t event, uint32_t revent,
+        std::function<void()> readCallback,
+        std::function<void()> writeCallback,
+        std::function<void()> closeCallback,
+        std::function<void()> errorCallback);
     ~Channel();
 
-    void publish_event(Timestamp receiveTime); // 核心函数，事件发生后进行回调。何时被调用：EventLoop 事件循环中被调用（先通过 poller 返回活动 channels）
+    void publish_events(Timestamp receiveTime); // 核心函数，事件发生后进行回调。何时被调用：EventLoop 事件循环中被调用（先通过 poller 返回活动 channels）
 
     // 没有办法，没有 master 注册中心，只能把订阅函数 callback 存在本类里，所以也需要提供公开接口
     void subscribe_on_read(std::function<void()> cb);
@@ -73,14 +78,16 @@ public:
     void subscribe_on_error(std::function<void()> cb);
 
 public:
-    int get_fd() const { return fd; }
-    uint32_t get_event() const { return event; }
+    int get_fd() const;
+    uint32_t get_event() const;
 
-    void enable_reading(); // 设置 fd 感兴趣的事件
+    // 设置 fd 感兴趣的事件
+    void enable_reading();
     void disable_reading();
     void enable_writing();
     void disable_writing();
     void disable_all();
 
-    void set_revent(uint32_t _revent) { revent = _revent; } // poller 监听到事件后设置此。handle 也根据此（发生的不同事件）执行不同的回调函数
+    // poller 监听到事件后设置此值
+    void set_revent(uint32_t _revent);
 };

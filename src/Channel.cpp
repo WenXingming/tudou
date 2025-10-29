@@ -15,23 +15,30 @@ const int Channel::kNoneEvent = 0;
 const int Channel::kReadEvent = EPOLLIN | EPOLLPRI;
 const int Channel::kWriteEvent = EPOLLOUT;
 
-Channel::Channel(EventLoop* _loop, int _fd)
+// 构造函数。把 fd、event、revent、readCallback 等都设置为参数可能更好，避免使用时忘记设置
+Channel::Channel(EventLoop* _loop, int _fd, uint32_t _event, uint32_t _revent,
+    std::function<void()> _readCallback, std::function<void()> _writeCallback,
+    std::function<void()> _closeCallback, std::function<void()> _errorCallback)
     : loop(_loop)
     , fd(_fd)
-    , event(0)
-    , revent(0)
-    , readCallback(nullptr)
-    , writeCallback(nullptr)
-    , closeCallback(nullptr)
-    , errorCallback(nullptr) {}
+    , event(_event)
+    , revent(_revent)
+    , readCallback(std::move(_readCallback))
+    , writeCallback(std::move(_writeCallback))
+    , closeCallback(std::move(_closeCallback))
+    , errorCallback(std::move(_errorCallback)) {
 
-Channel::~Channel() {}
-
-void Channel::publish_event(Timestamp receiveTime) {
-    publish_event_with_guard(receiveTime);
 }
 
-void Channel::publish_event_with_guard(Timestamp receiveTime) {
+Channel::~Channel() {
+
+}
+
+void Channel::publish_events(Timestamp receiveTime) {
+    publish_events_with_guard(receiveTime);
+}
+
+void Channel::publish_events_with_guard(Timestamp receiveTime) {
     LOG::LOG_DEBUG("poller find event, channel publish event: %d", revent);
 
     if ((revent & EPOLLHUP) && !(revent & EPOLLIN)) {
@@ -43,11 +50,9 @@ void Channel::publish_event_with_guard(Timestamp receiveTime) {
         return;
     }
     if (revent & (EPOLLIN | EPOLLPRI)) {
-        // if (readCallback) readCallback(/* receiveTime */);
         this->publish_read();
     }
     if (revent & EPOLLOUT) {
-        // if (writeCallback) writeCallback();
         this->publish_write();
     }
 }
@@ -77,6 +82,10 @@ void Channel::disable_all() {
     update();
 }
 
+void Channel::set_revent(uint32_t _revent) {
+    revent = _revent;
+}
+
 void Channel::update() {
     loop->update_channel(this);
 }
@@ -95,6 +104,14 @@ void Channel::subscribe_on_close(std::function<void()> cb) {
 
 void Channel::subscribe_on_error(std::function<void()> cb) {
     this->errorCallback = std::move(cb);
+}
+
+int Channel::get_fd() const {
+    return fd;
+}
+
+uint32_t Channel::get_event() const {
+    return event;
 }
 
 void Channel::publish_read() {
@@ -120,4 +137,3 @@ void Channel::publish_error() {
         this->errorCallback();
     else LOG::LOG_ERROR("Channel::publish_error(). no errorCallback.");
 }
-

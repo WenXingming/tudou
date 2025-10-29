@@ -16,6 +16,7 @@ class EventLoop;
 class Channel;
 class Poller : public NonCopyable {
 private:
+    // 先调用基类构造函数。loop 派生类并没有用到，所以在基类里面是 private
     EventLoop* ownLoop; // poller 所属的 EventLoop。子类 poller 暂时无需依赖，所以 private
 
 protected:

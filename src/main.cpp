@@ -27,7 +27,7 @@
 void test_netlib() {
     EventLoop loop;
 
-    Channel stdinChannel(&loop, 0); // fd = 0 (标准输入)
+    Channel stdinChannel(&loop, 0, 0, 0, nullptr, nullptr, nullptr, nullptr); // fd = 0 (标准输入)
     stdinChannel.enable_reading();
     stdinChannel.subscribe_on_read([&](/* Timestamp receivetime */) {
         char buf[1024]{};
@@ -97,4 +97,3 @@ int main() {
 // int main() {
 
 // }
-

@@ -1,0 +1,33 @@
+%%{init: {
+    "theme": "default",
+    "themeVariables": {
+        "fontFamily": "Times New Roman",
+        "fontSize": "20px"
+    }
+}}%%
+
+sequenceDiagram
+    title Reactor 反应堆时序图
+    autonumber
+
+    actor one
+    participant EventLoop
+    participant Poller
+    participant Channel
+    participant TcpAcceptor
+    participant TcpConnection
+	
+    one ->> EventLoop: loop()
+    loop
+	EventLoop->>Poller: poll(timeoutMs)
+
+    activate Poller
+    Poller->>Poller: get_activate_channels()
+    deactivate Poller
+    
+    Poller->>EventLoop: active channels
+	EventLoop->>Channel: channel→publish_events()
+	Channel->> TcpAcceptor: publish_read()
+	Channel->> TcpConnection: publish_read()、close()...
+    end
+	EventLoop->>Poller: poller→poll()

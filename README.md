@@ -222,11 +222,11 @@ sequenceDiagram
 	EventLoop->>Poller: poller→poll()
 
     activate Poller
-    Poller->>Poller: fill_active_channels()
+    Poller->>Poller: get_activate_channels()
     deactivate Poller
     
     Poller->>EventLoop: active channels
-	EventLoop->>Channel: channel→publish_event()
+	EventLoop->>Channel: channel→publish_events()
 	Channel->> TcpAcceptor: publish_read()
 	Channel->> TcpConnection: publish_read()、close()...
     end
