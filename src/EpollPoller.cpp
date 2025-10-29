@@ -1,8 +1,16 @@
-#include "EpollPoller.h"
+/**
+ * @file EpollPoller.h
+ * @brief 基于 epoll 的 Poller 实现 — 多路 I/O 事件分发器（Reactor 的 I/O 多路复用层）
+ * @author wenxingming
+ * @project: https://github.com/WenXingming/tudou
+ *
+ */
+
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
 #include <iostream>
+#include "EpollPoller.h"
 #include "../base/Log.h"
 #include "../base/Timestamp.h"
 #include "Channel.h"
@@ -34,12 +42,12 @@ EpollPoller::~EpollPoller() {
 /// @param timeoutMs 
 /// @return 
 std::vector<Channel*> EpollPoller::poll(int timeoutMs) {
-    LOG::LOG_DEBUG("EpollPoller::poll(). epoll is running... poller monitors channels's size is: %d", channels.size());
+    LOG::LOG_DEBUG("Epoll is running... poller monitors channels's size is: %d", channels.size());
     std::vector<Channel*> activeChannels;
 
     int numReady = epoll_wait(epollFd, eventList.data(), static_cast<int>(eventList.size()), timeoutMs);
     if (numReady > 0) {
-        LOG::LOG_DEBUG("EpollPoller::poll(). epoll is running...  activeChannels's size is: %d", numReady);
+        LOG::LOG_DEBUG("Epoll is running...  activeChannels's size is: %d", numReady);
         activeChannels.reserve(numReady);
         activeChannels = get_activate_channels(numReady);
 
@@ -79,9 +87,9 @@ std::vector<Channel*> EpollPoller::get_activate_channels(int numReady) const {
 /// @param numReady 
 void EpollPoller::event_list_auto_resize(int numReady) {
     if (numReady == eventList.size()) {
-        eventList.resize(eventList.size() * 2);
+        eventList.resize(eventList.size() * 1.5);
     }
-    else if (numReady < eventList.size() * 0.1) {
+    else if (numReady < eventList.size() * 0.25 && eventList.size() > eventListSize) {
         eventList.resize(eventList.size() * 0.5);
     }
 }

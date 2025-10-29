@@ -15,6 +15,7 @@ bool Poller::has_channel(const Channel* channel) const {
     //     return true;
     // }
     // else return false;
+    return false; // base Poller does not have channels map
 }
 
 Poller* Poller::new_default_poller(EventLoop* loop) {

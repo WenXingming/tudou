@@ -1,9 +1,9 @@
 /**
  * @file main.cpp
- * @brief 测试
+ * @brief 单元测试
  * @author wenxingming
  * @date 2025-09-06
- * @note My project address: https://github.com/WenXingming/Multi_IO
+ * @project: https://github.com/WenXingming/Multi_IO
  */
 
 #include <iostream>
@@ -79,21 +79,11 @@ int main() {
     // 日志系统
     // LOG::disable_debug();
 
-    // std::thread t1(test_netlib);
-    // t1.join();
+    std::thread t1(test_netlib);
+    t1.join();
 
     std::thread t2(test_server);
     t2.join();
 
     return 0;
 }
-
-// #include "EventLoop.h"
-// #include "TcpServer.h"
-// #include "Buffer.h"
-// #include "TcpConnection.h"
-// #include <iostream>
-
-// int main() {
-
-// }

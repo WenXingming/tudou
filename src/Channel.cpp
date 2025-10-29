@@ -1,8 +1,9 @@
 /**
- * @file Channel.cpp
- * @brief 理解为通道，用于事件回调处理
+ * @file Channel.h
+ * @brief Channel 用于把 IO 事件与回调绑定起来的抽象。
  * @author wenxingming
- * @note My project address: https://github.com/WenXingming/Multi_IO
+ * @project: https://github.com/WenXingming/tudou
+ *
  */
 
 #include "Channel.h"
@@ -15,7 +16,7 @@ const int Channel::kNoneEvent = 0;
 const int Channel::kReadEvent = EPOLLIN | EPOLLPRI;
 const int Channel::kWriteEvent = EPOLLOUT;
 
-// 构造函数。把 fd、event、revent、readCallback 等都设置为参数可能更好，避免使用时忘记设置
+// 构造函数。把 fd、event、revent、readCallback 等都设置为参数可能更好，避免使用时忘记设置（提醒使用者）
 Channel::Channel(EventLoop* _loop, int _fd, uint32_t _event, uint32_t _revent,
     std::function<void()> _readCallback, std::function<void()> _writeCallback,
     std::function<void()> _closeCallback, std::function<void()> _errorCallback)
@@ -90,7 +91,7 @@ void Channel::update() {
     loop->update_channel(this);
 }
 
-void Channel::subscribe_on_read(std::function<void(/* Timestamp */)> cb) {
+void Channel::subscribe_on_read(std::function<void()> cb) {
     this->readCallback = std::move(cb);
 }
 
@@ -115,25 +116,37 @@ uint32_t Channel::get_event() const {
 }
 
 void Channel::publish_read() {
-    if (this->readCallback)
+    if (this->readCallback) {
         this->readCallback();
-    else LOG::LOG_ERROR("Channel::publish_read(). no readCallback.");
+    }
+    else {
+        LOG::LOG_ERROR("Channel::publish_read(). no readCallback.");
+    }
 }
 
 void Channel::publish_write() {
-    if (this->writeCallback)
+    if (this->writeCallback) {
         this->writeCallback();
-    else LOG::LOG_ERROR("Channel::publish_write(). no writeCallback.");
+    }
+    else {
+        LOG::LOG_ERROR("Channel::publish_write(). no writeCallback.");
+    }
 }
 
 void Channel::publish_close() {
-    if (this->closeCallback)
+    if (this->closeCallback) {
         this->closeCallback();
-    else LOG::LOG_ERROR("Channel::publish_close(). no closeCallback.");
+    }
+    else {
+        LOG::LOG_ERROR("Channel::publish_close(). no closeCallback.");
+    }
 }
 
 void Channel::publish_error() {
-    if (this->errorCallback)
+    if (this->errorCallback) {
         this->errorCallback();
-    else LOG::LOG_ERROR("Channel::publish_error(). no errorCallback.");
+    }
+    else {
+        LOG::LOG_ERROR("Channel::publish_error(). no errorCallback.");
+    }
 }

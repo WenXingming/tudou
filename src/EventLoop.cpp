@@ -1,8 +1,8 @@
 /**
- * @file EventLoop.cpp
- * @brief 事件循环类，负责事件循环
+ * @file EventLoop.h
+ * @brief 事件循环（Reactor）核心类，驱动 I/O 事件的收集与回调执行。
  * @author wenxingming
- * @note My project address: https://github.com/WenXingming/Multi_IO
+ * @project: https://github.com/WenXingming/tudou
  */
 
 #include "EventLoop.h"
@@ -20,9 +20,13 @@
 
 EventLoop::EventLoop()
     : poller(Poller::new_default_poller(this))
-    , pollTimeoutMs(5000) {}
+    , pollTimeoutMs(5000) {
 
-EventLoop::~EventLoop() {}
+}
+
+EventLoop::~EventLoop() {
+
+}
 
 /// @brief 事件循环。Rector 模式：通过 poller（IO多路复用）获取活动的 channels，然后调用 channel 的 publish_events 进行事件分发回调
 void EventLoop::loop() {
