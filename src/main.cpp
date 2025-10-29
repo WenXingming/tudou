@@ -48,7 +48,7 @@ void test_netlib() {
 void test_server() {
     EventLoop loop;
     InetAddress listenAddr = InetAddress(8080);
-    TcpServer server(&loop, listenAddr);
+    TcpServer server(&loop, listenAddr, nullptr);
 
     server.subscribe_message(
         [](const std::shared_ptr<TcpConnection>& conn) {
@@ -79,8 +79,8 @@ int main() {
     // 日志系统
     // LOG::disable_debug();
 
-    std::thread t1(test_netlib);
-    t1.join();
+    // std::thread t1(test_netlib);
+    // t1.join();
 
     std::thread t2(test_server);
     t2.join();

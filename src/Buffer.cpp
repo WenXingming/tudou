@@ -1,3 +1,11 @@
+/**
+ * @file Buffer.h
+ * @brief 高效字节缓冲区，管理可读/可写/预留区域，并支持与 fd 的非阻塞读写。
+ * @author
+ * @project: https://github.com/WenXingming/tudou
+ *
+ */
+
 #include "Buffer.h"
 #include <unistd.h>
 #include <errno.h>

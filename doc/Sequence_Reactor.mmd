@@ -19,15 +19,15 @@ sequenceDiagram
 
     one ->> EventLoop: loop()
     loop
-    EventLoop->>Poller: poll(timeoutMs)
+        EventLoop->>Poller: poll(timeoutMs)
 
-    activate Poller
-    Poller->>Poller: get_activate_channels()
-    deactivate Poller
-    
-    Poller->>EventLoop: active channels
-    EventLoop->>Channel: channel→publish_events()
-    Channel->> TcpAcceptor: publish_read()
-    Channel->> TcpConnection: publish_read()、close()...
+        activate Poller
+        Poller->>Poller: get_activate_channels()
+        deactivate Poller
+        
+        Poller->>EventLoop: active channels
+        EventLoop->>Channel: channel→publish_events()
+        Channel->> TcpAcceptor: publish_read()
+        Channel->> TcpConnection: publish_read()、close()...
     end
     EventLoop->>Poller: poller→poll()

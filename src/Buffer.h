@@ -1,27 +1,44 @@
 /**
  * @file Buffer.h
- * @brief
+ * @brief 高效字节缓冲区，管理可读/可写/预留区域，并支持与 fd 的非阻塞读写。
+ * @author
+ * @project: https://github.com/WenXingming/tudou
  * @details
- * @note My project address: https://github.com/WenXingming/Multi_IO
+ *
+ * 内部模型：
+ *   A buffer class modeled after org.jboss.netty.buffer.ChannelBuffer
+ *   @code
+ *   +-------------------+------------------+------------------+
+ *   | prependable bytes |  readable bytes  |  writable bytes  |
+ *   |                   |     (CONTENT)    |                  |
+ *   +-------------------+------------------+------------------+
+ *   |                   |                  |                  |
+ *   0   <=   readerIndex   <=   writerIndex   <=   size
+ *   @endcode
+ *
+ * - 写入后自动成为可读数据（writerIndex 前移）；读取仅推进 readerIndex；retrieve_all 可重置。
+ * - make_space 在可写空间不足时优先搬移复用，否则扩容，减少分配与拷贝。
+ * - 设计的精巧之地在于：
+ * -    1. 读取 fd 写入 buffer（当然是写入 writable bytes）后的数据对于上层而言自动转换为了可读这一角色；
+ *         例如：fd ==> buffer 后，数据转变为了可读区域，上层只需从 readBuffer 的可读区域取数据
+ * -    2. 从 buffer（当然是 readable bytes）中读取数据到 fd 后，数据对于上层而言自动转变为了可写区域。
+ *         上层 ==> buffer 后，数据转变为了可读区域，write_to_fd 也只需从 writeBuffer 的可读区域取数据
+ *
+ * I/O 约定：
+ * - read_from_fd(): 将 fd 数据读入 writable 区域；返回读取字节数，失败时设置 savedErrno（如 EAGAIN）。
+ * - write_to_fd(): 将 readable 区域写入 fd；返回写入字节数，失败时设置 savedErrno（如 EAGAIN）。
+ * - 上层通过 write_to_buffer()/read_from_buffer() 与缓冲区进行数据搬运。
+ *
+ * 线程模型：
+ * - 非线程安全；通常在所属连接的 EventLoop 线程内使用，跨线程需外部同步。
+ *
+ * 参考：
+ * - 设计参考 Netty 的 ChannelBuffer。
  */
 
 #pragma once
 #include <vector>
 #include <string>
-
- /// A buffer class modeled after org.jboss.netty.buffer.ChannelBuffer
- ///
- /// @code
- /// +-------------------+------------------+------------------+
- /// | prependable bytes |  readable bytes  |  writable bytes  |
- /// |                   |     (CONTENT)    |                  |
- /// +-------------------+------------------+------------------+
- /// |                   |                  |                  |
- /// 0      <=      readerIndex   <=   writerIndex    <=     size
- /// @endcode
- /// @details 设计的精巧之地在于，写入 buffer 后的数据自动转换为了可读这一角色。
- /// @details 例如：fd ==> buffer 后，数据转变为了可读区域，上层只需从可读区域取数据
- /// @details      上层 ==> buffer 后，数据转变为了可读区域，write_to_fd 也只需从可读区域取数据
 
 class Buffer {
 private:

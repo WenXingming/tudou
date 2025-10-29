@@ -65,8 +65,8 @@ classDiagram
             -std::unique_ptr<Channel> channel
             
             -read_callback() // channel 的回调处理函数
-            -publish_new_connection(int connFd)
-            +subscribe_new_connection(std::function cb)
+            -publish_on_connect(int connFd)
+            +subscribe_on_connect(std::function cb)
         }
 
         class TcpConnection {

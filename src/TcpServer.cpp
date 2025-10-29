@@ -1,3 +1,11 @@
+/**
+ * @file TcpServer.h
+ * @brief TCP 服务器：管理 Acceptor 与 TcpConnection，会话创建、回调接线与连接生命周期管理。
+ * @author
+ * @project: https://github.com/WenXingming/tudou
+ *
+ */
+
 #include "TcpServer.h"
 #include "EventLoop.h"
 #include "Acceptor.h"
@@ -8,41 +16,35 @@
 #include <iostream>
 #include <cassert>
 #include <functional>
-
 #include "../base/InetAddress.h"
 #include "../base/Log.h"
 
-TcpServer::TcpServer(EventLoop* _loop, const InetAddress& _listenAddr)
-    : acceptor(new Acceptor(_loop, _listenAddr))
-    , connections{}
-    , loop(_loop)
-    , messageCallback(nullptr) {
+TcpServer::TcpServer(EventLoop* _loop, const InetAddress& _listenAddr, TcpServer::MessageCallback _messageCallback)
+    : loop(_loop)
+    , acceptor(new Acceptor(_loop, _listenAddr, nullptr)) // 先传入空指针，后面再设置回调函数
+    , connections()
+    , messageCallback(std::move(_messageCallback)) {
 
-    acceptor->subscribe_new_connection(
-        // 绑定 this 参数会有风险吗？此时构造函数还未执行完，就使用了 this 指针。其实也没事，只是绑定，没有通过 this 访问类成员（还未构造完不可访问，否则有风险）
-        // 可以使用 lambda
-        std::bind(&TcpServer::new_connection_callback, this, std::placeholders::_1)
+    // 设置 Acceptor 的回调函数。使用 bind 绑定成员函数作为回调
+    acceptor->subscribe_on_connect(
+        std::bind(&TcpServer::on_connect_callback, this, std::placeholders::_1) // 或者可以使用 lambda
     );
 }
 
 TcpServer::~TcpServer() {
     this->connections.clear();
-    /* this->loop = nullptr;
-    this->messageCallback = nullptr; */
 }
 
 void TcpServer::start() {
     // EventLoop 开始循环时，Acceptor 会自动监听
 }
 
+void TcpServer::on_connect_callback(int connFd) {
+    LOG::LOG_DEBUG("New connection created. fd is: %d", connFd);
 
-
-void TcpServer::new_connection_callback(int connFd) {
-    LOG::LOG_DEBUG("TcpServer::new_connection(). new connection created. fd is: %d", connFd);
-
-    // 初始化 conn
+    // 初始化 conn。设置业务层回调函数，callback 是由业务传入的，TcpServer 并不实现 callback 只是做中间者
     auto conn = std::make_shared<TcpConnection>(loop, connFd);
-    conn->subscribe_message(this->messageCallback); // 设置业务层回调函数。callback 是由业务传入的，TcpServer 并不实现 callback 只是做中间者
+    conn->subscribe_message(this->messageCallback);
     conn->subscribe_close(std::bind(&TcpServer::close_callback, this, std::placeholders::_1));
 
     connections[connFd] = conn;

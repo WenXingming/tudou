@@ -14,19 +14,19 @@ flowchart TD
     end
 
     subgraph NetLayer
+        TcpConnnection -.-> Buffer
         TcpServer
-        Acceptor
         TcpConnnection
+        Acceptor
         Buffer
         %% TcpServer --> Acceptor 
         %% TcpServer --> TcpConnnection
-        TcpConnnection -.-> Buffer
     end
 
     subgraph Reactor
         EventLoop
-        Channel
         Poller
+        Channel
     end
 
     subgraph OS_Kernel

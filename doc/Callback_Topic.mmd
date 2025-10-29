@@ -12,7 +12,7 @@
 %%     publish_close_1((publish_close_1))
 %%     publish_error((publish_error))
     
-%%     publish_new_connection((publish_new_connection))
+%%     publish_on_connect((publish_on_connect))
 %%     publish_message((publish_message))
 %%     publish_close_2((publish_close_2))
     
@@ -29,11 +29,11 @@
 %%     publish_close_1 -.->TcpConnection
 %%     publish_error -.->TcpConnection
     
-%%     Acceptor -.-> publish_new_connection
+%%     Acceptor -.-> publish_on_connect
 %%     TcpConnection -.-> publish_message
 %%     TcpConnection -.-> publish_close_2
     
-%%     publish_new_connection -.-> TcpServer
+%%     publish_on_connect -.-> TcpServer
 %%     publish_message -.中介.-> TcpServer -.中介.-> 业务层
 %%     publish_close_2 -.-> TcpServer
 
@@ -58,7 +58,7 @@ graph TD
     Channel -.publish_close.-> TcpConnection
     Channel -.publish_error.-> TcpConnection
     
-    Acceptor -.publish_new_connection.-> TcpServer
+    Acceptor -.publish_on_connect.-> TcpServer
     TcpConnection -.publish_message(中介).-> TcpServer
     TcpConnection -.publish_close.-> TcpServer
     

@@ -1,3 +1,11 @@
+/**
+ * @file Acceptor.h
+ * @brief 监听新连接的接入器（封装 listenFd 及持有其 Channel），在有连接到来时接受并上报给上层。
+ * @author wenxingming
+ * @project: https://github.com/WenXingming/tudou
+ *
+ */
+
 #include "Acceptor.h"
 #include "EventLoop.h"
 #include "Channel.h"
@@ -7,56 +15,51 @@
 #include <netinet/in.h>
 #include <iostream>
 #include <cassert>
-
 #include "../base/Timestamp.h"
 #include "../base/Log.h"
 
 
-Acceptor::Acceptor(EventLoop* _loop, const InetAddress& _listenAddr) // 构造函数里访问 this 需要小心一些：有些成员变量没有在初始化列表里，是默认初始化
+Acceptor::Acceptor(EventLoop* _loop, const InetAddress& _listenAddr, std::function<void(int)> _connectCallback) // 构造函数里访问 this 需要小心一些：有些成员变量没有在初始化列表里，是默认初始化
     : loop(_loop)
     , listenAddr(_listenAddr)
-    , newConnectionCallback(nullptr) {
+    , connectCallback(std::move(_connectCallback)) {
 
     // 初始化 this->listenFd
     this->create_fd();
     this->bind_address();
-    this->listen_start();
+    this->start_listen();
 
-    // 初始化 channel. 也可以放在初始化列表里，但注意初始化顺序（依赖 listenFd）
+    // 初始化 channel. 也可以放在初始化列表里，但注意初始化顺序（依赖 listenFd）。这里是 unique_ptr，channel 没有无参构造函数， 如果是对象则无法初始化会编译失败
     // 注意：创建 channel 后需要设置 intesting event 和 订阅（发生事件后的回调函数）；并注册到 poller
     this->channel.reset(new Channel(this->loop, this->listenFd, 0, 0,
         nullptr, nullptr, nullptr, nullptr));
     this->channel->enable_reading();
     this->channel->subscribe_on_read(std::bind(&Acceptor::read_callback, this));
-    this->loop->update_channel(channel.get());
+    this->channel->update();
 }
 
 Acceptor::~Acceptor() {
-    ::close(this->listenFd); // listenFd 生命期应该由 Acceptor 管理（创建和销毁）
+    // listenFd 生命期应该由 Acceptor 管理（创建和销毁）
+    if (this->listenFd > 0) {
+        ::close(this->listenFd);
+    }
 }
 
-
-
 void Acceptor::create_fd() {
-    this->listenFd = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0); // 直接非阻塞
-    if (this->listenFd == -1) {
-        LOG::LOG_FATAL("Acceptor::create_fd(). create listenFd failed, errno is: %d.", errno);
-    }
+    // 创建非阻塞 socket
+    this->listenFd = ::socket(AF_INET, SOCK_STREAM | SOCK_NONBLOCK, 0);
+    assert(this->listenFd >= 0);
 }
 
 void Acceptor::bind_address() {
     sockaddr_in address = this->listenAddr.get_sockaddr();
     int bindRet = ::bind(this->listenFd, (sockaddr*)&address, sizeof(address));
-    if (bindRet == -1) {
-        LOG::LOG_FATAL("Acceptor::bind_address(). create listenFd failed, errno is: %d.", errno);
-    }
+    assert(bindRet != -1);
 }
 
-void Acceptor::listen_start() {
+void Acceptor::start_listen() {
     int listenRet = ::listen(this->listenFd, SOMAXCONN);
-    if (listenRet == -1) {
-        LOG::LOG_FATAL("Acceptor::listen_start(). listen failed, errno is: %d.", errno);
-    }
+    assert(listenRet != -1);
 }
 
 void Acceptor::read_callback() {
@@ -64,23 +67,25 @@ void Acceptor::read_callback() {
     socklen_t len = sizeof(clientAddr);
     int connFd = ::accept(this->listenFd, (sockaddr*)&clientAddr, &len);
     if (connFd >= 0) {
-        LOG::LOG_DEBUG("Acceptor::handle_read(). connectFd %d is accepted.", connFd);
-        publish_new_connection(connFd);
+        LOG::LOG_DEBUG("ConnectFd %d is accepted.", connFd);
+        publish_on_connect(connFd);
     }
     else {
         LOG::LOG_ERROR("Acceptor::handle_read(). accept error, errno: %d", errno);
     }
 }
 
-void Acceptor::subscribe_new_connection(std::function<void(int)> cb) {
-    this->newConnectionCallback = std::move(cb);
+void Acceptor::subscribe_on_connect(std::function<void(int)> cb) {
+    this->connectCallback = std::move(cb);
 }
 
-void Acceptor::publish_new_connection(int connFd) {
-    if (newConnectionCallback)
-        newConnectionCallback(connFd);
+//@brief 发布新连接事件给上层 TcpServer, TcpServer 根据 connFd 创建 TcpConnection
+void Acceptor::publish_on_connect(int connFd) {
+    if (connectCallback) {
+        connectCallback(connFd);
+    }
     else {
-        LOG::LOG_ERROR("Acceptor::publish_new_connection(). No newConnectionCallback setted.");
+        LOG::LOG_ERROR("Acceptor::publish_on_connect(). No connectCallback setted.");
         ::close(connFd);
     }
 }

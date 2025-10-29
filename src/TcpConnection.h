@@ -1,8 +1,32 @@
 /**
  * @file TcpConnection.h
- * @brief
+ * @brief 面向连接的 TCP 会话封装，负责收发缓冲、事件回调与状态管理。
+ * @author wenxingming
+ * @project: https://github.com/WenXingming/tudou
  * @details
- * @note My project address: https://github.com/WenXingming/Multi_IO
+ *
+ * 职责：
+ * - 封装已建立连接的 fd（connectFd）及其 Channel（持有），处理读/写/关闭/错误事件。
+ * - 维护读写 Buffer，向上提供 send()/recv()，并通过回调对接业务层与 TcpServer。
+ * - 对外暴露 subscribe_message()/subscribe_close() 以设置回调，实现与上层解耦。
+ *
+ * 线程模型与约定：
+ * - 与所属 EventLoop 线程绑定；除可封装为投递的接口外，方法应在该线程调用。
+ * - 非线程安全；如需跨线程调用，建议配合 runInLoop/queueInLoop 与唤醒机制（若后续引入）。
+ *
+ * 生命周期与所有权：
+ * - 使用 enable_shared_from_this，自保活以保证回调执行期对象有效。
+ * - 持有 Channel/Buffer 的唯一所有权；不拥有上层对象，仅保存回调函数。
+ *
+ * I/O 与回调：
+ * - read_callback(): 读取数据至 readBuffer，触发 message 回调。
+ * - write_callback(): 将 writeBuffer 数据写入内核，必要时关闭写事件关注。
+ * - close_callback(): 处理对端关闭并发布 close 回调，由上层完成资源回收。
+ * - error_callback(): 记录错误并执行必要清理。
+ *
+ * 错误处理与边界：
+ * - 考虑 EAGAIN/EWOULDBLOCK、短读/短写、对端半关闭等场景。
+ * - 背压：send() 追加数据到 writeBuffer 并开启写事件，避免阻塞写。
  */
 
 #pragma once
@@ -51,7 +75,6 @@ public:
     void subscribe_message(MessageCallback _cb);
     // TcpConnection <==> TcpServer
     void subscribe_close(CloseCallback _cb);
-
 
     void send(const std::string& msg);
     std::string recv();

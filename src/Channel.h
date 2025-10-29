@@ -82,6 +82,9 @@ public:
     // poller 监听到事件后设置此值
     void set_revent(uint32_t _revent);
 
+    // 当改变 channel 的 event 后，需要在 poller 里面更改（更新） channel。何时被调用：调用 enable_reading 等函数改变 event 后
+    void update();
+
 private:
     void publish_events_with_guard(Timestamp receiveTime); // 根据事件调用回调函数。何时被调用：被 publish_events() 调用
 
@@ -90,8 +93,4 @@ private:
     void publish_write();
     void publish_close();
     void publish_error();
-
-    // 当改变 channel 的 event 后，需要在 poller 里面更改（更新） channel。何时被调用：调用 enable_reading 等函数改变 event 后
-    void update();
-
 };

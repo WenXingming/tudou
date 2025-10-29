@@ -1,11 +1,19 @@
+/**
+ * @file TcpConnection.h
+ * @brief 面向连接的 TCP 会话封装，负责收发缓冲、事件回调与状态管理。
+ * @author wenxingming
+ * @project: https://github.com/WenXingming/tudou
+ *
+ */
+
+#include <iostream>
+#include <assert.h>
+#include <unistd.h>
+#include <sys/socket.h>
 #include "TcpConnection.h"
 #include "EventLoop.h"
 #include "Channel.h"
 #include "Buffer.h"
-#include <unistd.h>
-#include <sys/socket.h>
-#include <iostream>
-
 #include "../base/Timestamp.h"
 #include "../base/Log.h"
 
@@ -25,15 +33,13 @@ TcpConnection::TcpConnection(EventLoop* _loop, int _connFd)
     channel->subscribe_on_write([this]() { this->write_callback(); });
     channel->subscribe_on_close([this]() { this->close_callback(); });
     channel->subscribe_on_error([this]() { this->error_callback(); });
-    loop->update_channel(channel.get());
+    channel->update();
 }
 
 TcpConnection::~TcpConnection() {
     // 虽然 connFd 是由 Acceptor 创建的，但是由 TcpConnection 持有，所以应该由其负责销毁
     int retClose = ::close(this->connectFd);
-    if (retClose != 0) {
-        LOG::LOG_ERROR("TcpConnection::~TcpConnection(). close fd failed, fd: ", this->connectFd);
-    }
+    assert(retClose != -1);
 }
 
 Buffer* TcpConnection::get_input_buffer() {
@@ -90,7 +96,9 @@ void TcpConnection::publish_message() {
     if (messageCallback) {
         messageCallback(shared_from_this());
     }
-    else LOG::LOG_ERROR("TcpConnection::publish_message(). no messageCallback setted.");
+    else {
+        LOG::LOG_ERROR("TcpConnection::publish_message(). no messageCallback setted.");
+    }
 }
 
 void TcpConnection::publish_close() {
